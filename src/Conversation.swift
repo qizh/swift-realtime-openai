@@ -495,17 +495,18 @@ private extension Conversation {
 // Other private methods
 extension Conversation {
 	/// This hack is required because relying on `queuedSamples.isEmpty` directly crashes the app.
-	/// This is because updating the `queuedSamples` array on a background thread will trigger a re-render of any views that depend on it on that thread.
+	/// This is because updating the `queuedSamples` array on a background thread
+	/// will trigger a re-render of any views that depend on it on that thread.
 	/// So, instead, we observe the property and update `isPlaying` on the main actor.
 	private func _keepIsPlayingPropertyUpdated() {
-		withObservationTracking { _ = queuedSamples.isEmpty } onChange: { [weak self] in
+		withObservationTracking {
+			_ = queuedSamples.isEmpty
+		} onChange: { [weak self] in
+			guard let self else { return }
 			Task { @MainActor in
-				guard let self else { return }
-
 				self.isPlaying = !self.queuedSamples.isEmpty
+				self._keepIsPlayingPropertyUpdated()
 			}
-
-			self?._keepIsPlayingPropertyUpdated()
 		}
 	}
 }
