@@ -70,8 +70,12 @@ import HelperCoders
 	}
 	
 	public enum AudioFormatType: String, CaseIterable, Equatable, Hashable, Codable, Sendable {
-		case pcm16 = "pcm16"
-		case audio_pcm = "audio/pcm"
+		/// high-quality, uncompressed audio (what OpenAI Realtime API expects: 16-bit PCM, 24 kHz)
+		case pcm = "audio/pcm"
+		/// telephony-grade compressed audio (μ-law, North America/Japan)
+		case pcmu = "audio/pcmu"
+		/// telephony-grade compressed audio (A-law, Europe/elsewhere)
+		case pcma = "audio/pcma"
 	}
 
 	/// Configuration for input and output audio.
