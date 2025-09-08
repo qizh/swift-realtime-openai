@@ -58,6 +58,20 @@ import HelperCoders
 	public struct AudioFormat: Equatable, Hashable, Codable, Sendable {
 		public var rate: Int
 		public var type: String
+		
+		public init(rate: Int, type: String) {
+			self.rate = rate
+			self.type = type
+		}
+		
+		@inlinable public init(rate: Int, type: AudioFormatType) {
+			self.init(rate: rate, type: type.rawValue)
+		}
+	}
+	
+	public enum AudioFormatType: String, CaseIterable, Equatable, Hashable, Codable, Sendable {
+		case pcm16 = "pcm16"
+		case audio_pcm = "audio/pcm"
 	}
 
 	/// Configuration for input and output audio.
