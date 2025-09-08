@@ -95,7 +95,7 @@ import MetaCodable
 		contentIndex: Int,
 		transcript: String,
 		logprobs: [LogProb]?,
-		usage: AudioTranscriptionUsage // Response.Usage
+		usage: AudioTranscriptionUsage?
 	)
 
 	/// Returned when the text value of an input audio transcription content part is updated.
