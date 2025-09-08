@@ -15,17 +15,45 @@ let package = Package(
 		.library(name: "RealtimeAPI", targets: ["RealtimeAPI"]),
 	],
 	dependencies: [
-		.package(url: "https://github.com/livekit/webrtc-xcframework.git", branch: "main"),
+		.package(url: "https://github.com/livekit/webrtc-xcframework.git", .upToNextMajor(from: "137.7151.05")),
 		.package(url: "https://github.com/SwiftyLab/MetaCodable.git", .upToNextMajor(from: "1.0.0")),
 	],
 	targets: [
-		.target(name: "Core", dependencies: [
-			.product(name: "MetaCodable", package: "MetaCodable"),
-			.product(name: "HelperCoders", package: "MetaCodable"),
-		]),
-		.target(name: "WebSocket", dependencies: ["Core"]),
-		.target(name: "UI", dependencies: ["Core", "WebRTC"]),
-		.target(name: "RealtimeAPI", dependencies: ["Core", "WebSocket", "WebRTC", "UI"]),
-		.target(name: "WebRTC", dependencies: ["Core", .product(name: "LiveKitWebRTC", package: "webrtc-xcframework")]),
+		.target(
+			name: "Core",
+			dependencies: [
+				.product(name: "MetaCodable", package: "MetaCodable"),
+				.product(name: "HelperCoders", package: "MetaCodable"),
+			]
+		),
+		.target(
+			name: "WebSocket",
+			dependencies: [
+				"Core",
+			]
+		),
+		.target(
+			name: "UI",
+			dependencies: [
+				"Core",
+				"WebRTC",
+			]
+		),
+		.target(
+			name: "RealtimeAPI",
+			dependencies: [
+				"Core",
+				"WebSocket",
+				"WebRTC",
+				"UI",
+			]
+		),
+		.target(
+			name: "WebRTC",
+			dependencies: [
+				"Core",
+				.product(name: "LiveKitWebRTC", package: "webrtc-xcframework")
+			]
+		),
 	]
 )
