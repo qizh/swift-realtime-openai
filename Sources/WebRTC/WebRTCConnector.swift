@@ -6,6 +6,43 @@ import Foundation
 import FoundationNetworking
 #endif
 
+// Thread-safe wrapper for audio track reference
+private final class AudioTrackHolder: @unchecked Sendable {
+	private let lock = NSLock()
+	private var track: LKRTCAudioTrack?
+	private var enabled: Bool = true
+	
+	func setTrack(_ newTrack: LKRTCAudioTrack?) {
+		lock.lock()
+		defer { lock.unlock() }
+		track = newTrack
+		track?.isEnabled = enabled
+	}
+	
+	func setEnabled(_ isEnabled: Bool) {
+		lock.lock()
+		defer { lock.unlock() }
+		enabled = isEnabled
+		track?.isEnabled = enabled
+	}
+	
+	func getEnabled() -> Bool {
+		lock.lock()
+		defer { lock.unlock() }
+		return enabled
+	}
+	
+	func clearIfMatches(_ checkTrack: LKRTCAudioTrack) -> Bool {
+		lock.lock()
+		defer { lock.unlock() }
+		if track == checkTrack {
+			track = nil
+			return true
+		}
+		return false
+	}
+}
+
 @Observable public final class WebRTCConnector: NSObject, Connector, Sendable {
 	public enum WebRTCError: Error {
 		case invalidEphemeralKey
@@ -28,6 +65,20 @@ import FoundationNetworking
 	package let audioTrack: LKRTCAudioTrack
 	private let dataChannel: LKRTCDataChannel
 	private let connection: LKRTCPeerConnection
+	
+	// Thread-safe storage for remote audio control
+	private let remoteAudioHolder = AudioTrackHolder()
+	
+	/// Controls whether remote audio output is enabled
+	package var remoteAudioEnabled: Bool {
+		get {
+			remoteAudioHolder.getEnabled()
+		}
+		set {
+			remoteAudioHolder.setEnabled(newValue)
+			print(newValue ? "🔊 Remote audio enabled" : "🔇 Remote audio disabled")
+		}
+	}
 
 	private let stream: AsyncThrowingStream<ServerEvent, Error>.Continuation
 
@@ -178,9 +229,27 @@ private extension WebRTCConnector {
 
 extension WebRTCConnector: LKRTCPeerConnectionDelegate {
 	public func peerConnectionShouldNegotiate(_: LKRTCPeerConnection) {}
-	public func peerConnection(_: LKRTCPeerConnection, didAdd _: LKRTCMediaStream) {}
+	
+	public func peerConnection(_: LKRTCPeerConnection, didAdd stream: LKRTCMediaStream) {
+		// Store reference to remote audio track when it's added
+		if let audioTrack = stream.audioTracks.first {
+			remoteAudioHolder.setTrack(audioTrack)
+			print("🔊 Remote audio track received and stored (enabled: \(remoteAudioHolder.getEnabled()))")
+		}
+	}
+	
 	public func peerConnection(_: LKRTCPeerConnection, didOpen _: LKRTCDataChannel) {}
-	public func peerConnection(_: LKRTCPeerConnection, didRemove _: LKRTCMediaStream) {}
+	
+	public func peerConnection(_: LKRTCPeerConnection, didRemove stream: LKRTCMediaStream) {
+		// Clear reference when stream is removed
+		for track in stream.audioTracks {
+			if remoteAudioHolder.clearIfMatches(track) {
+				print("🔇 Remote audio track removed")
+				break
+			}
+		}
+	}
+	
 	public func peerConnection(_: LKRTCPeerConnection, didChange _: LKRTCSignalingState) {}
 	public func peerConnection(_: LKRTCPeerConnection, didGenerate _: LKRTCIceCandidate) {}
 	public func peerConnection(_: LKRTCPeerConnection, didRemove _: [LKRTCIceCandidate]) {}
