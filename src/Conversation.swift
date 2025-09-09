@@ -11,6 +11,7 @@ public final class Conversation: @unchecked Sendable {
 	private let client: RealtimeAPI
 	@MainActor private var isInterrupting: Bool = false
 	private let errorStream: AsyncStream<ServerError>.Continuation
+	private var keepIsPlayingPropertyUpdatedTask: Task<(), Never>?
 
 	private var task: Task<Void, Error>!
 	private let audioEngine = AVAudioEngine()
@@ -60,7 +61,17 @@ public final class Conversation: @unchecked Sendable {
 	private init(client: RealtimeAPI) {
 		self.client = client
 		(errors, errorStream) = AsyncStream.makeStream(of: ServerError.self)
-
+		
+		Task { @MainActor in
+			let samplesStream = self.stream(of: \.queuedSamples)
+			keepIsPlayingPropertyUpdatedTask?.cancel()
+			keepIsPlayingPropertyUpdatedTask = Task {
+				for await samples in samplesStream {
+					isPlaying = !samples.isEmpty
+				}
+			}
+		}
+		
 		let events = client.events
 		task = Task.detached { [weak self] in
 			for try await event in events {
@@ -73,7 +84,7 @@ public final class Conversation: @unchecked Sendable {
 				self?.connected = false
 			}
 		}
-
+		
 		Task { @MainActor in
 			client.onDisconnect = { [weak self] in
 				guard let self else { return }
@@ -82,15 +93,14 @@ public final class Conversation: @unchecked Sendable {
 					self.connected = false
 				}
 			}
-
-			_keepIsPlayingPropertyUpdated()
 		}
 	}
 
 	deinit {
 		task.cancel()
 		errorStream.finish()
-
+		keepIsPlayingPropertyUpdatedTask?.cancel()
+		
 		Task { [playerNode, audioEngine] in
 			Self.cleanUpAudio(playerNode: playerNode, audioEngine: audioEngine)
 		}
@@ -206,15 +216,15 @@ public extension Conversation {
 	@MainActor func startHandlingVoice() throws {
 		guard !handlingVoice else { return }
 
-#if os(iOS)
+		#if os(iOS)
 		// 1️⃣ Configure and activate the session first
 		let audioSession = AVAudioSession.sharedInstance()
 		try audioSession.setCategory(.playAndRecord,
 		                             mode: .voiceChat,
-		                             options: [.defaultToSpeaker, .allowBluetooth])
+									 options: [.defaultToSpeaker, .allowBluetoothHFP])
 		try audioSession.setPreferredSampleRate(48_000)   // optional but typical
 		try audioSession.setActive(true)
-#endif
+		#endif
 
 		// 2️⃣ Now the format has a real sample-rate
 		let hwFormat = audioEngine.inputNode.outputFormat(forBus: 0)
@@ -227,9 +237,9 @@ public extension Conversation {
 		// letting the engine pick a format avoids future mismatches
 		audioEngine.connect(playerNode, to: audioEngine.mainMixerNode, format: nil)
 
-#if os(iOS)
+		#if os(iOS)
 		try audioEngine.inputNode.setVoiceProcessingEnabled(true)
-#endif
+		#endif
 
 		audioEngine.prepare()
 		do {
@@ -468,26 +478,24 @@ private extension Conversation {
 		if buffer.format == converter.outputFormat {
 			return buffer
 		}
-
+		
 		guard let convertedBuffer = AVAudioPCMBuffer(pcmFormat: converter.outputFormat, frameCapacity: capacity) else {
 			print("Failed to create converted audio buffer.")
 			return nil
 		}
-
+		
 		var error: NSError?
-		var allSamplesReceived = false
-
+		
+		// Provide the source buffer once, then indicate end-of-stream on subsequent requests
 		let status = converter.convert(to: convertedBuffer, error: &error) { _, outStatus in
-			if allSamplesReceived {
-				outStatus.pointee = .noDataNow
-				return nil
-			}
-
-			allSamplesReceived = true
+			// First call: provide data
 			outStatus.pointee = .haveData
 			return buffer
 		}
-
+		
+		// If the converter asks again, it will get EOS internally since we gave a single buffer.
+		// Some converter implementations may still report .inputRanDry or .error; handle below.
+		
 		if status == .error {
 			if let error = error {
 				print("Error during conversion: \(error.localizedDescription)")
@@ -496,24 +504,5 @@ private extension Conversation {
 		}
 
 		return convertedBuffer
-	}
-}
-
-// Other private methods
-extension Conversation {
-	/// This hack is required because relying on `queuedSamples.isEmpty` directly crashes the app.
-	/// This is because updating the `queuedSamples` array on a background thread
-	/// will trigger a re-render of any views that depend on it on that thread.
-	/// So, instead, we observe the property and update `isPlaying` on the main actor.
-	private func _keepIsPlayingPropertyUpdated() {
-		withObservationTracking {
-			_ = queuedSamples.isEmpty
-		} onChange: { [weak self] in
-			guard let self else { return }
-			Task { @MainActor in
-				self.isPlaying = !self.queuedSamples.isEmpty
-				self._keepIsPlayingPropertyUpdated()
-			}
-		}
 	}
 }
