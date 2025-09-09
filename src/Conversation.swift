@@ -1,5 +1,6 @@
 import Foundation
-@preconcurrency import AVFoundation
+import AVFoundation
+import os.log
 
 public enum ConversationError: Error {
 	case sessionNotFound
@@ -57,19 +58,41 @@ public final class Conversation: @unchecked Sendable {
 			default: return nil
 		} }
 	}
+	
+	fileprivate let logger = Logger(subsystem: "OpenAI Reailtime", category: "Conversation")
 
 	private init(client: RealtimeAPI) {
 		self.client = client
 		(errors, errorStream) = AsyncStream.makeStream(of: ServerError.self)
 		
-		Task { @MainActor in
-			let samplesStream = self.stream(of: \.queuedSamples)
-			keepIsPlayingPropertyUpdatedTask?.cancel()
-			keepIsPlayingPropertyUpdatedTask = Task {
-				for await samples in samplesStream {
-					isPlaying = !samples.isEmpty
-				}
+		let logger = logger
+		Task { @MainActor [weak self] in
+			guard let emptySamplesStream = self?.stream(of: \.queuedSamples.isEmpty) else {
+				logger.warning("(isPlaying) Failed to create samples stream")
+				return
 			}
+			logger.debug("(isPlaying) Create samples stream")
+			self?.keepIsPlayingPropertyUpdatedTask?.cancel()
+			self?.keepIsPlayingPropertyUpdatedTask = Task {
+				logger.debug("(isPlaying) Start task awaiting for samples")
+				for await areSamplesEmpty in emptySamplesStream {
+					guard let self else {
+						logger.warning("(isPlaying) Conversation already deallocated")
+						break
+					}
+					guard !Task.isCancelled else {
+						logger.warning("(isPlaying) Task cancelled")
+						break
+					}
+					logger.debug("(isPlaying) Received samples are \(areSamplesEmpty ? "empty" : "NOT empty")")
+					if self.isPlaying != !areSamplesEmpty {
+						self.isPlaying = !areSamplesEmpty
+					}
+					logger.debug("(isPlaying) Assigned \(self.isPlaying, format: .truth) to isPlaying")
+				}
+				logger.info("(isPlaying) Exit continuous task")
+			}
+			logger.info("(isPlaying) Exit init task")
 		}
 		
 		let events = client.events
