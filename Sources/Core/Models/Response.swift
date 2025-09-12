@@ -1,6 +1,9 @@
+import QizhMacroKit
+
 public struct Response: Identifiable, Equatable, Hashable, Codable, Sendable {
 	public struct Config: Equatable, Hashable, Codable, Sendable {
-		public enum Conversation: String, Equatable, Hashable, Codable, Sendable {
+		@IsCase
+		public enum Conversation: String, Equatable, Hashable, Codable, Sendable, CaseIterable {
 			/// The contents of the response will be added to the default conversation.
 			case auto
 			/// An out-of-band response which will not add items to default conversation.
@@ -54,7 +57,8 @@ public struct Response: Identifiable, Equatable, Hashable, Codable, Sendable {
 			self.input = input
 		}
 	}
-
+	
+	@IsCase
 	public enum Status: String, Equatable, Hashable, Codable, Sendable {
 		case failed
 		case completed

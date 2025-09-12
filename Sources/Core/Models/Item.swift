@@ -1,7 +1,11 @@
 import Foundation
 import MetaCodable
+import QizhMacroKit
 
-@Codable @CodedAt("type") public enum Item: Identifiable, Equatable, Hashable, Sendable {
+@IsCase @CaseName @CaseValue
+@Codable @CodedAt("type")
+public enum Item: Identifiable, Equatable, Hashable, Sendable {
+	@IsCase
 	public enum Status: String, Equatable, Hashable, Codable, Sendable {
 		case completed, incomplete, inProgress = "in_progress"
 	}
@@ -22,17 +26,20 @@ import MetaCodable
 			self.init(audio: audio.map { AudioData(data: $0) }, transcript: transcript)
 		}
 	}
-
+	
+	@IsCase @CaseName @CaseValue
 	public enum ContentPart: Equatable, Hashable, Sendable {
 		case text(String)
 		case audio(Audio)
 	}
 
 	public struct Message: Identifiable, Equatable, Hashable, Codable, Sendable {
-		public enum Role: String, Equatable, Hashable, Codable, Sendable {
+		@IsCase
+		public enum Role: String, Equatable, Hashable, Codable, Sendable, CaseIterable {
 			case system, assistant, user
 		}
-
+		
+		@IsCase @CaseName @CaseValue
 		public enum Content: Equatable, Hashable, Sendable {
 			case text(String)
 			case audio(Audio)
@@ -371,7 +378,7 @@ public extension Item.Message.Content {
 // MARK: Codable implementations
 
 extension Item.ContentPart: Codable {
-	private enum CodingKeys: String, CodingKey {
+	private enum CodingKeys: String, CodingKey, CaseIterable {
 		case type, text, audio, transcript
 	}
 
@@ -414,7 +421,7 @@ extension Item.ContentPart: Codable {
 }
 
 extension Item.Message.Content: Codable {
-	private enum CodingKeys: String, CodingKey {
+	private enum CodingKeys: String, CodingKey, CaseIterable {
 		case type
 		case text
 		case audio

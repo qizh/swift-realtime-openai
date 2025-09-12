@@ -2,12 +2,15 @@ import Foundation
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
+import QizhMacroKit
 
 public struct RealtimeAPI: Sendable {
-	public enum Error: Swift.Error {
+	@IsCase @CaseName
+	public enum Error: Swift.Error, CaseIterable, Hashable, Sendable {
 		case invalidMessage
 	}
-
+	
+	@IsCase
 	public enum Status: String, CaseIterable, Equatable, Hashable, Sendable {
 		case connected, connecting, disconnected
 	}

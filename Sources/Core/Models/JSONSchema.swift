@@ -1,7 +1,11 @@
+import QizhMacroKit
+
 /// Represents a JSON Schema for validating JSON data structures.
+@IsCase @CaseName @CaseValue
 public indirect enum JSONSchema: Equatable, Hashable, Sendable {
 	/// Represents the format of a string in JSON Schema.
-	public enum StringFormat: String, Codable, Hashable, Equatable, Sendable {
+	@IsCase
+	public enum StringFormat: String, Codable, Hashable, Equatable, Sendable, CaseIterable {
 		case ipv4, ipv6, uuid, date, time, email, duration, hostname, dateTime = "date-time"
 	}
 
@@ -68,7 +72,7 @@ public indirect enum JSONSchema: Equatable, Hashable, Sendable {
 }
 
 extension JSONSchema: Codable {
-	private enum CodingKeys: String, CodingKey {
+	private enum CodingKeys: String, CodingKey, CaseIterable {
 		case type, items, `enum`, anyOf, format, pattern, required, minItems, maxItems, minimum, maximum,
 		     properties, multipleOf, description, exclusiveMinimum, exclusiveMaximum, additionalProperties
 	}

@@ -1,7 +1,11 @@
 import Foundation
 import MetaCodable
+import QizhMacroKit
 
-@Codable @CodedAt("type") public enum Tool: Equatable, Hashable, Sendable {
+@IsCase @CaseName @CaseValue
+@Codable @CodedAt("type")
+public enum Tool: Equatable, Hashable, Sendable {
+	@IsCase @CaseName @CaseValue
 	public enum Choice: Equatable, Hashable, Sendable {
 		/// The model will not call any tool and instead generates a message.
 		case none
@@ -42,7 +46,8 @@ import MetaCodable
 	}
 
 	@Codable public struct MCP: Equatable, Hashable, Sendable {
-		public enum Connector: String, Equatable, Hashable, Codable, Sendable {
+		@IsCase
+		public enum Connector: String, Equatable, Hashable, Codable, Sendable, CaseIterable {
 			case gmail = "connector_gmail"
 			case dropbox = "connector_dropbox"
 			case sharepoint = "connector_sharepoint"
@@ -52,9 +57,11 @@ import MetaCodable
 			case microsoftTeams = "connector_microsoftteams"
 			case outlookCalendar = "connector_outlookcalendar"
 		}
-
+		
+		@IsCase @CaseName @CaseValue
 		public enum RequireApproval: Equatable, Hashable, Sendable {
 			/// Approval policies for MCP tools.
+			@IsCase
 			public enum Approval: String, CaseIterable, Equatable, Hashable, Codable, Sendable {
 				case always
 				case never
@@ -144,7 +151,7 @@ import MetaCodable
 }
 
 extension Tool.Choice: Codable {
-	enum CodingKeys: String, CodingKey {
+	enum CodingKeys: String, CodingKey, CaseIterable {
 		case type
 		case name
 		case mode
@@ -201,7 +208,7 @@ extension Tool.MCP.RequireApproval: Codable {
 	static let never = Self.all(.never)
 	static let always = Self.all(.always)
 
-	private enum CodingKeys: String, CodingKey {
+	private enum CodingKeys: String, CodingKey, CaseIterable {
 		case always, never
 	}
 

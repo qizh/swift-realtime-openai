@@ -1,7 +1,10 @@
 import Foundation
 import MetaCodable
+import QizhMacroKit
 
-@Codable @CodedAt("type") public enum ServerEvent: Sendable {
+@IsCase @CaseName @CaseValue
+@Codable @CodedAt("type")
+public enum ServerEvent: Sendable {
 	public struct RateLimit: Equatable, Hashable, Codable, Sendable {
 		/// The name of the rate limit
 		public let name: String

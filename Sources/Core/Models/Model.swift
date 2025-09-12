@@ -1,3 +1,5 @@
+import QizhMacroKit
+
 public enum Model: RawRepresentable, Equatable, Hashable, Codable, Sendable {
 	case gptRealtime
 	case custom(String)
@@ -18,6 +20,7 @@ public enum Model: RawRepresentable, Equatable, Hashable, Codable, Sendable {
 }
 
 public extension Model {
+	@IsCase
 	enum Transcription: String, CaseIterable, Equatable, Hashable, Codable, Sendable {
 		case whisper = "whisper-1"
 		case gpt4o = "gpt-4o-transcribe-latest"

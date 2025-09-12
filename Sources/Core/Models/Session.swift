@@ -1,12 +1,15 @@
 import Foundation
 import MetaCodable
 import HelperCoders
+import QizhMacroKit
 
 @Codable public struct Session: Equatable, Hashable, Sendable {
-	public enum Modality: String, Equatable, Hashable, Codable, Sendable {
+	@IsCase
+	public enum Modality: String, Equatable, Hashable, Codable, Sendable, CaseIterable {
 		case text, audio
 	}
-
+	
+	@IsCase @CaseName @CaseValue
 	public enum MaxResponseOutputTokens: Equatable, Hashable, Sendable, Codable {
 		case inf
 		case limited(Int)
@@ -56,7 +59,8 @@ import HelperCoders
 			self.variables = variables
 		}
 	}
-
+	
+	@IsCase
 	public enum Voice: String, CaseIterable, Equatable, Hashable, Codable, Sendable {
 		case alloy, ash, ballad, coral, echo, sage, shimmer, verse, marin, cedar
 	}
@@ -109,12 +113,14 @@ import HelperCoders
 			/// Configuration for turn detection
 			public struct TurnDetection: Codable, Equatable, Hashable, Sendable {
 				/// The type of turn detection.
-				public enum VAD: String, Codable, Equatable, Hashable, Sendable {
+				@IsCase
+				public enum VAD: String, Codable, Equatable, Hashable, Sendable, CaseIterable {
 					case server = "server_vad"
 					case semantic = "semantic_vad"
 				}
 
 				/// The eagerness of the model to respond.
+				@IsCase
 				public enum Eagerness: String, CaseIterable, Equatable, Hashable, Codable, Sendable {
 					case auto, low, medium, high
 				}

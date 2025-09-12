@@ -1,7 +1,10 @@
 import Foundation
 import MetaCodable
+import QizhMacroKit
 
-@Codable @CodedAt("type") public enum ClientEvent: Equatable, Hashable, Sendable {
+@IsCase @CaseName @CaseValue
+@Codable @CodedAt("type")
+public enum ClientEvent: Equatable, Hashable, Sendable {
 	/// Send this event to update the session’s default configuration.
 	///
 	/// The client may send this event at any time to update any field, except for voice.
