@@ -1,0 +1,61 @@
+name: Tests
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+jobs:
+    tests:
+        strategy:
+          fail-fast: false
+          matrix:
+            swift: ["6.1", "main-snapshot"]
+        runs-on: macos-latest
+        steps:
+            - name: Install Swift toolchain
+              shell: bash
+              run: |
+                set -e
+
+                export SWIFTLY_BIN_DIR=${{ github.workspace }}/.swiftly/bin
+                export SWIFTLY_HOME_DIR=${{ github.workspace }}/.swiftly/share
+
+                echo "TOOLCHAINS=swift" >> $GITHUB_ENV
+                echo "$SWIFTLY_BIN_DIR" >> $GITHUB_PATH
+                echo "SWIFTLY_BIN_DIR=$SWIFTLY_BIN_DIR" >> $GITHUB_ENV
+                echo "SWIFTLY_HOME_DIR=$SWIFTLY_HOME_DIR" >> $GITHUB_ENV
+
+                export PATH=$SWIFTLY_BIN_DIR:$PATH
+
+                mkdir -p $SWIFTLY_BIN_DIR
+                mkdir -p $SWIFTLY_HOME_DIR
+
+                curl -O https://download.swift.org/swiftly/darwin/swiftly.pkg
+                installer -pkg swiftly.pkg -target CurrentUserHomeDirectory
+                cp ~/.swiftly/bin/swiftly $SWIFTLY_BIN_DIR
+                rm swiftly.pkg
+
+                swiftly init --no-modify-profile --quiet-shell-followup --assume-yes --skip-install --verbose
+                echo "swiftly version: $(swiftly --version)" >&2
+
+                swiftly install --assume-yes --use ${{ matrix.swift }}
+            - uses: actions/checkout@v4
+
+            - name: Restore .build
+              id: restore-build
+              uses: actions/cache/restore@v4
+              with:
+                path: .build
+                restore-keys: "swiftpm-tests-build-${{ runner.os }}-${{ matrix.swift }}-"
+                key: "swiftpm-tests-build-${{ runner.os }}-${{ matrix.swift }}-${{ github.event.pull_request.base.sha || github.event.after }}"
+
+            - name: Build
+              run: swift build
+
+            - name: Cache .build
+              if: steps.restore-build.outputs.cache-hit != 'true'
+              uses: actions/cache/save@v4
+              with:
+                path: .build
+                key: "swiftpm-tests-build-${{ runner.os }}-${{ matrix.swift }}-${{ github.event.pull_request.base.sha || github.event.after }}"

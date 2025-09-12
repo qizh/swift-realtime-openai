@@ -3,29 +3,29 @@
 import PackageDescription
 
 let package = Package(
-	name: "OpenAIRealtime",
+	name: "RealtimeAPI",
 	platforms: [
 		.iOS(.v17),
 		.tvOS(.v17),
 		.macOS(.v14),
-		.watchOS(.v10),
 		.visionOS(.v1),
 		.macCatalyst(.v17),
 	],
 	products: [
-		.library(name: "OpenAIRealtime", type: .static, targets: ["OpenAIRealtime"]),
+		.library(name: "RealtimeAPI", targets: ["RealtimeAPI"]),
 	],
 	dependencies: [
-		.package(url: "https://github.com/stasel/WebRTC.git", .upToNextMajor(from: "139.0.0")),
-		// .package(url: "https://github.com/stasel/WebRTC.git", branch: "latest"),
+		.package(url: "https://github.com/livekit/webrtc-xcframework.git", branch: "main"),
+		.package(url: "https://github.com/SwiftyLab/MetaCodable.git", .upToNextMajor(from: "1.0.0")),
 	],
 	targets: [
-		.target(
-			name: "OpenAIRealtime",
-			dependencies: [
-				"WebRTC",
-			],
-			path: "./src"
-		),
+		.target(name: "Core", dependencies: [
+			.product(name: "MetaCodable", package: "MetaCodable"),
+			.product(name: "HelperCoders", package: "MetaCodable"),
+		]),
+		.target(name: "WebSocket", dependencies: ["Core"]),
+		.target(name: "UI", dependencies: ["Core", "WebRTC"]),
+		.target(name: "RealtimeAPI", dependencies: ["Core", "WebSocket", "WebRTC", "UI"]),
+		.target(name: "WebRTC", dependencies: ["Core", .product(name: "LiveKitWebRTC", package: "webrtc-xcframework")]),
 	]
 )
