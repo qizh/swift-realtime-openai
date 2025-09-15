@@ -28,6 +28,14 @@ public final class Conversation: @unchecked Sendable {
 		}
 	}
 
+	/// Whether to enable audio output playback from the model.
+	/// When false, the model's audio responses will be muted.
+	public var audioOutputEnabled: Bool = true {
+		didSet {
+			client.remoteAudioEnabled = audioOutputEnabled
+		}
+	}
+
 	/// The unique ID of the conversation.
 	public private(set) var id: String?
 
@@ -178,6 +186,13 @@ private extension Conversation {
 				self.session = session
 			case let .conversationItemCreated(_, item, _):
 				entries.append(item)
+			case let .conversationItemAdded(_, item, _):
+				entries.append(item)
+			case let .conversationItemDone(_, item, _):
+				// Update the existing item with the completed version
+				if let index = entries.firstIndex(where: { $0.id == item.id }) {
+					entries[index] = item
+				}
 			case let .conversationItemDeleted(_, itemId):
 				entries.removeAll { $0.id == itemId }
 			case let .conversationItemInputAudioTranscriptionCompleted(_, itemId, contentIndex, transcript, _, _):
@@ -243,6 +258,9 @@ private extension Conversation {
 			case .outputAudioBufferStarted:
 				isModelSpeaking = true
 			case .outputAudioBufferStopped:
+				isModelSpeaking = false
+			case .outputAudioBufferCleared:
+				// Audio buffer was cleared, model is no longer speaking
 				isModelSpeaking = false
 			case let .responseOutputItemDone(_, _, _, item):
 				updateEvent(id: item.id) { message in
