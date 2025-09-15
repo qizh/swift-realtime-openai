@@ -21,7 +21,7 @@ import MetaCodable
 		public var logprob: Double
 		public var token: String
 	}
-	
+  
 	/// Usage statistics for audio transcription
 	public struct TranscriptionUsage: Codable, Equatable, Hashable, Sendable {
 		/// Type of usage (e.g., "duration")
@@ -99,6 +99,7 @@ import MetaCodable
 		transcript: String,
 		logprobs: [LogProb]?,
 		usage: TranscriptionUsage
+		//usage: Response.Usage
 	)
 
 	/// Returned when the text value of an input audio transcription content part is updated.
@@ -231,7 +232,7 @@ import MetaCodable
 	/// - Parameter responseId: The ID of the Response to which the output audio belongs.
 	@CodedAs("output_audio_buffer.stopped")
 	case outputAudioBufferStopped(eventId: String, responseId: String)
-	
+
 	/// Returned when the output audio buffer is cleared.
 	///
 	/// - Parameter eventId: The unique ID of the server event.
