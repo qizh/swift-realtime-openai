@@ -51,7 +51,7 @@ import QizhMacroKit
 		///
 		/// The substitution values can either be strings, or other Response input types like images or files.
 		public var variables: [String: String]?
-		
+
 		/// Creates a new Prompt configuration
 		public init(id: String, version: String? = nil, variables: [String: String]? = nil) {
 			self.id = id
@@ -69,7 +69,7 @@ import QizhMacroKit
 	public struct AudioFormat: Equatable, Hashable, Codable, Sendable {
 		public var rate: Int
 		public var type: String
-		
+
 		public init(rate: Int, type: String) {
 			self.rate = rate
 			self.type = type

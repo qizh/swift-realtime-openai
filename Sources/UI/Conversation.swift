@@ -27,7 +27,7 @@ public final class Conversation: @unchecked Sendable {
 			client.audioTrack.isEnabled = !muted
 		}
 	}
-	
+
 	/// Whether to enable audio output playback from the model.
 	/// When false, the model's audio responses will be muted.
 	public var audioOutputEnabled: Bool = true {

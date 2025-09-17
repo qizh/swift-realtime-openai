@@ -229,7 +229,7 @@ private extension WebRTCConnector {
 
 extension WebRTCConnector: LKRTCPeerConnectionDelegate {
 	public func peerConnectionShouldNegotiate(_: LKRTCPeerConnection) {}
-	
+
 	public func peerConnection(_: LKRTCPeerConnection, didAdd stream: LKRTCMediaStream) {
 		// Store reference to remote audio track when it's added
 		if let audioTrack = stream.audioTracks.first {
@@ -250,6 +250,10 @@ extension WebRTCConnector: LKRTCPeerConnectionDelegate {
 		}
 	}
 	
+	//public func peerConnection(_: LKRTCPeerConnection, didAdd _: LKRTCMediaStream) {}
+	//public func peerConnection(_: LKRTCPeerConnection, didOpen _: LKRTCDataChannel) {}
+	//public func peerConnection(_: LKRTCPeerConnection, didRemove _: LKRTCMediaStream) {}
+  
 	public func peerConnection(_: LKRTCPeerConnection, didChange _: LKRTCSignalingState) {}
 	public func peerConnection(_: LKRTCPeerConnection, didGenerate _: LKRTCIceCandidate) {}
 	public func peerConnection(_: LKRTCPeerConnection, didRemove _: [LKRTCIceCandidate]) {}
