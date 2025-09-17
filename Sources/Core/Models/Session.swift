@@ -69,11 +69,24 @@ import QizhMacroKit
 	public struct AudioFormat: Equatable, Hashable, Codable, Sendable {
 		public var rate: Int
 		public var type: String
-
+		
 		public init(rate: Int, type: String) {
 			self.rate = rate
 			self.type = type
 		}
+		
+		@inlinable public init(rate: Int, type: AudioFormatType) {
+			self.init(rate: rate, type: type.rawValue)
+		}
+	}
+	
+	public enum AudioFormatType: String, CaseIterable, Equatable, Hashable, Codable, Sendable {
+		/// high-quality, uncompressed audio (what OpenAI Realtime API expects: 16-bit PCM, 24 kHz)
+		case pcm = "audio/pcm"
+		/// telephony-grade compressed audio (μ-law, North America/Japan)
+		case pcmu = "audio/pcmu"
+		/// telephony-grade compressed audio (A-law, Europe/elsewhere)
+		case pcma = "audio/pcma"
 	}
 
 	/// Configuration for input and output audio.
