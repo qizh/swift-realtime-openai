@@ -201,7 +201,14 @@ import QizhMacroKit
 				/// - Parameter prefixPaddingMs: Amount of audio to include before speech starts (in milliseconds).
 				/// - Parameter silenceDurationMs: Duration of silence to detect speech stop (in milliseconds).
 				/// - Parameter threshold: Activation threshold for VAD (0.0 to 1.0).
-				public static func serverVad(createResponse: Bool = true, idleTimeout: Int? = nil, interruptResponse: Bool? = nil, prefixPaddingMs: Int? = nil, silenceDurationMs: Int? = nil, threshold: Double? = nil) -> TurnDetection {
+				public static func serverVad(
+					createResponse: Bool = true,
+					idleTimeout: Int? = nil,
+					interruptResponse: Bool? = nil,
+					prefixPaddingMs: Int? = nil,
+					silenceDurationMs: Int? = nil,
+					threshold: Double? = nil
+				) -> TurnDetection {
 					.init(createResponse: createResponse, eagerness: nil, idleTimeout: idleTimeout, interruptResponse: interruptResponse, prefixPaddingMs: prefixPaddingMs, silenceDurationMs: silenceDurationMs, threshold: threshold, type: .server)
 				}
 
@@ -327,36 +334,42 @@ import QizhMacroKit
 	///
 	/// Provide an integer between 1 and 4096 to limit output tokens, or `inf` for the maximum available tokens for a given model.
 	public var maxResponseOutputTokens: MaxResponseOutputTokens?
-
+	
 	/// The set of modalities the model can respond with.
-	public var modalities: [Modality]?
-
+	/// - Important: Either `[.text]` or `[.voice]` are allowed values.
+	@CodedAs("output_modalities")
+	public var outputModalities: [Modality]?
+	
 	/// The Realtime model used for this session.
 	public var model: Model
-
+	
 	/// Reference to a prompt template and its variables.
 	public var prompt: Prompt?
-
-	/// Sampling temperature for the model, limited to [0.6, 1.2].
-	///
-	/// For audio models a temperature of 0.8 is highly recommended for best performance.
-	public var temperature: Double?
-
+	
 	/// How the model chooses tools.
 	public var toolChoice: Tool.Choice?
 
 	/// Tools available to the model.
 	public var tools: [Tool]?
 
-	public init(id: String? = nil, audio: Audio, instructions: String, maxResponseOutputTokens: MaxResponseOutputTokens? = nil, modalities: [Modality]? = nil, model: Model, prompt: Prompt? = nil, temperature: Double? = nil, toolChoice: Tool.Choice? = nil, tools: [Tool]? = nil) {
+	public init(
+		id: String? = nil,
+		audio: Audio,
+		instructions: String,
+		maxResponseOutputTokens: MaxResponseOutputTokens? = nil,
+		outputModalities: [Modality]? = nil,
+		model: Model,
+		prompt: Prompt? = nil,
+		toolChoice: Tool.Choice? = nil,
+		tools: [Tool]? = nil
+	) {
 		self.id = id
 		self.tools = tools
 		self.model = model
 		self.audio = audio
 		self.prompt = prompt
 		self.toolChoice = toolChoice
-		self.modalities = modalities
-		self.temperature = temperature
+		self.outputModalities = outputModalities
 		self.instructions = instructions
 		self.maxResponseOutputTokens = maxResponseOutputTokens
 	}
