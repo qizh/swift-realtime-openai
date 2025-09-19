@@ -1,4 +1,5 @@
 import Core
+import Helpers
 import AVFAudio
 import Foundation
 @preconcurrency import LiveKitWebRTC
@@ -69,6 +70,9 @@ private final class AudioTrackHolder: @unchecked Sendable {
 	// Thread-safe storage for remote audio control
 	private let remoteAudioHolder = AudioTrackHolder()
 	
+	fileprivate static let logger = Log.create(category: "WebRTC Connector")
+	@ObservationIgnored fileprivate let logger = WebRTCConnector.logger
+	
 	/// Controls whether remote audio output is enabled
 	package var remoteAudioEnabled: Bool {
 		get {
@@ -76,7 +80,7 @@ private final class AudioTrackHolder: @unchecked Sendable {
 		}
 		set {
 			remoteAudioHolder.setEnabled(newValue)
-			print(newValue ? "🔊 Remote audio enabled" : "🔇 Remote audio disabled")
+			logger.info("\(newValue ? "🔊 Remote audio enabled" : "🔇 Remote audio disabled")")
 		}
 	}
 
@@ -192,7 +196,7 @@ private extension WebRTCConnector {
 			try audioSession.setMode(.videoChat)
 			try audioSession.setActive(true, options: .notifyOthersOnDeactivation)
 		} catch {
-			print("Failed to configure AVAudioSession: \(error)")
+			logger.error("Failed to configure AVAudioSession: \(error)")
 		}
 		#endif
 	}
@@ -234,7 +238,7 @@ extension WebRTCConnector: LKRTCPeerConnectionDelegate {
 		// Store reference to remote audio track when it's added
 		if let audioTrack = stream.audioTracks.first {
 			remoteAudioHolder.setTrack(audioTrack)
-			print("🔊 Remote audio track received and stored (enabled: \(remoteAudioHolder.getEnabled()))")
+			logger.info("🔊 Remote audio track received and stored (enabled: \(self.remoteAudioHolder.getEnabled()))")
 		}
 	}
 	
@@ -244,7 +248,7 @@ extension WebRTCConnector: LKRTCPeerConnectionDelegate {
 		// Clear reference when stream is removed
 		for track in stream.audioTracks {
 			if remoteAudioHolder.clearIfMatches(track) {
-				print("🔇 Remote audio track removed")
+				logger.info("🔇 Remote audio track removed")
 				break
 			}
 		}
@@ -260,7 +264,7 @@ extension WebRTCConnector: LKRTCPeerConnectionDelegate {
 	public func peerConnection(_: LKRTCPeerConnection, didChange _: LKRTCIceGatheringState) {}
 
 	public func peerConnection(_: LKRTCPeerConnection, didChange newState: LKRTCIceConnectionState) {
-		print("ICE Connection State changed to: \(newState)")
+		logger.debug("ICE Connection State changed to: \("\(newState)")")
 	}
 }
 
@@ -268,7 +272,7 @@ extension WebRTCConnector: LKRTCDataChannelDelegate {
 	public func dataChannel(_: LKRTCDataChannel, didReceiveMessageWith buffer: LKRTCDataBuffer) {
 		do { try stream.yield(decoder.decode(ServerEvent.self, from: buffer.data)) }
 		catch {
-			print("Failed to decode server event: \(String(data: buffer.data, encoding: .utf8) ?? "<invalid utf8>")")
+			logger.error("Failed to decode server event: \(String(data: buffer.data, encoding: .utf8) ?? "<invalid utf8>")")
 			stream.finish(throwing: error)
 		}
 	}

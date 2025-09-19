@@ -45,3 +45,24 @@ public struct ServerError: Codable, Equatable, Sendable {
 		self.eventId = eventId
 	}
 }
+
+extension ServerError: CustomStringConvertible {
+	public var description: String {
+		let parameters: String = [
+			"code": code,
+			"message": message,
+			"param": param,
+			"eventId": eventId
+		]
+		.compactMap { element in
+			if let value = element.value {
+				"\(element.key): \(value)"
+			} else {
+				nil
+			}
+		}
+		.joined(separator: ", ")
+		
+		return "\(type)(\(parameters))"
+	}
+}

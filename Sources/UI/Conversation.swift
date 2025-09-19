@@ -1,5 +1,6 @@
 import Core
 import WebRTC
+import Helpers
 import AVFAudio
 import Foundation
 import QizhMacroKit
@@ -14,15 +15,17 @@ public enum ConversationError: Error {
 @MainActor @Observable
 public final class Conversation: @unchecked Sendable {
 	public typealias SessionUpdateCallback = (inout Session) -> Void
-
+	
 	private let client: WebRTCConnector
 	private var task: Task<Void, Error>!
 	private let sessionUpdateCallback: SessionUpdateCallback?
 	private let errorStream: AsyncStream<ServerError>.Continuation
-
-	/// Whether to print debug information to the console.
+	
+	/// Whether to output debug information to the console.
 	public var debug: Bool
-
+	
+	fileprivate let logger = Log.create(category: "Conversation")
+	
 	/// Whether to mute the user's microphone.
 	public var muted: Bool = false {
 		didSet {
@@ -95,13 +98,16 @@ public final class Conversation: @unchecked Sendable {
 
 			do {
 				for try await event in self.client.events {
-					do { try await self.handleEvent(event) }
-					catch { print("Unhandled error in event handler: \(error)") }
+					do {
+						try await self.handleEvent(event)
+					} catch {
+						logger.error("Unhandled error in event handler: \(error)")
+					}
 
 					guard !Task.isCancelled else { break }
 				}
 			} catch {
-				print("Unhandled error in conversation task: \(error)")
+				logger.error("Unhandled error in conversation task: \(error)")
 			}
 		}
 	}
@@ -206,7 +212,7 @@ public final class Conversation: @unchecked Sendable {
 					eventId: .init(randomLength: 16)
 				)
 				
-				print("""
+				logger.error("""
 					Failed to send truncateConversationItem event
 					┣ error: \(error)
 					┗ server error: \(se)
@@ -286,12 +292,14 @@ public final class Conversation: @unchecked Sendable {
 /// Event handling private API
 private extension Conversation {
 	func handleEvent(_ event: ServerEvent) throws {
-		if debug { print(event) }
+		if debug {
+			logger.debug("\(event)")
+		}
 
 		switch event {
 		case let .error(_, error):
 			errorStream.yield(error)
-			print("Received error: \(error)")
+			logger.warning("Received error: \(error)")
 		case let .sessionCreated(_, session):
 			self.session = session
 			if let sessionUpdateCallback { try updateSession(withChanges: sessionUpdateCallback) }
@@ -316,7 +324,7 @@ private extension Conversation {
 			}
 		case let .conversationItemInputAudioTranscriptionFailed(_, _, _, error):
 			errorStream.yield(error)
-			print("Received error: \(error)")
+			logger.warning("Received error: \(error)")
 		case let .responseCreated(_, response):
 			if id == nil {
 				id = response.conversationId
@@ -430,7 +438,7 @@ private extension Conversation {
 			 .responseMCPCallCompleted,
 			 .responseMCPCallFailed,
 			 .rateLimitsUpdated:
-			print("Unhandled server event: \(event)")
+			logger.warning("Unhandled server event: \(event)")
 		}
 	}
 	

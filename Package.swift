@@ -21,18 +21,23 @@ let package = Package(
 	],
 	targets: [
 		.target(
+			name: "Helpers"
+		),
+		.target(
 			name: "Core",
 			dependencies: [
 				.product(name: "MetaCodable", package: "MetaCodable"),
 				.product(name: "HelperCoders", package: "MetaCodable"),
 				.product(name: "QizhMacroKit", package: "QizhMacroKit"),
 				.product(name: "QizhMacroKitClient", package: "QizhMacroKit"),
+				"Helpers",
 			]
 		),
 		.target(
 			name: "WebSocket",
 			dependencies: [
 				"Core",
+				"Helpers",
 			]
 		),
 		.target(
@@ -40,6 +45,7 @@ let package = Package(
 			dependencies: [
 				"Core",
 				"WebRTC",
+				"Helpers",
 			]
 		),
 		.target(
@@ -49,12 +55,14 @@ let package = Package(
 				"WebSocket",
 				"WebRTC",
 				"UI",
+				"Helpers",
 			]
 		),
 		.target(
 			name: "WebRTC",
 			dependencies: [
 				"Core",
+				"Helpers",
 				.product(name: "LiveKitWebRTC", package: "webrtc-xcframework"),
 			]
 		),
