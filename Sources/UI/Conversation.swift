@@ -175,12 +175,14 @@ public final class Conversation: @unchecked Sendable {
 	/// Interrupt the model's response if it's currently playing.
 	/// This lets the model know that the user didn't hear the full response.
 	public func interruptSpeech() {
-		guard !isInterrupting else { return }
+		guard isModelSpeaking,
+			  !isInterrupting else { return }
+		
 		isInterrupting = true
 		defer { isInterrupting = false }
 		
-		/// Calculate how much audio has already played (in milliseconds) using wall-clock
-		/// timing. Since `LKRTCAudioTrack` doesn't expose playback time, we track from
+		/// Calculate how much audio has already played (in milliseconds).
+		/// Since `LKRTCAudioTrack` doesn't expose playback time, we track from
 		/// output buffer events.
 		let currentPlayerTimeMs: Int = {
 			var ms = modelAudioAccumulatedMs
@@ -191,16 +193,30 @@ public final class Conversation: @unchecked Sendable {
 		}()
 		
 		/// Determine which item is currently playing.
-		let itemIDToTruncate: String? = currentlyPlayingAudioItemID()
-		
-		if isModelSpeaking, let itemIDToTruncate {
+		if let itemIDToTruncate = currentlyPlayingAudioItemID() {
 			do {
+				logger.debug("""
+					Sending `truncateConversationItem` event
+					┣ for item: \(itemIDToTruncate)
+					┗ at audio ms: \(currentPlayerTimeMs)
+					""")
 				try client.send(
 					event: .truncateConversationItem(
 						forItem: itemIDToTruncate,
 						atAudioMs: currentPlayerTimeMs
 					)
 				)
+				logger.debug("""
+					Did send `truncateConversationItem` event
+					┣ for item: \(itemIDToTruncate)
+					┗ at audio ms: \(currentPlayerTimeMs)
+					""")
+				logger.debug("Sending `cancelResponse` event")
+				try client.send(event: .cancelResponse())
+				logger.debug("Did send `cancelResponse` event")
+				logger.debug("Sending `outputAudioBufferClear` event")
+				try client.send(event: .outputAudioBufferClear())
+				logger.debug("Did send `outputAudioBufferClear` event")
 			} catch {
 				/// Convert any thrown error into a ServerError and emit it
 				let nse = error as NSError
@@ -213,7 +229,7 @@ public final class Conversation: @unchecked Sendable {
 				)
 				
 				logger.error("""
-					Failed to send truncateConversationItem event
+					Failed to send one of the interruption events
 					┣ error: \(error)
 					┗ server error: \(se)
 					""")
@@ -224,8 +240,9 @@ public final class Conversation: @unchecked Sendable {
 		modelAudioAccumulatedMs = currentPlayerTimeMs
 		modelAudioStartDate = nil
 		playingItemID = nil
-		isModelSpeaking = false
-		muted = false
+		// audioOutputEnabled = false
+		// isModelSpeaking = false
+		// muted = false
 	}
 	
 	// MARK: - Send
@@ -293,7 +310,7 @@ public final class Conversation: @unchecked Sendable {
 private extension Conversation {
 	func handleEvent(_ event: ServerEvent) throws {
 		if debug {
-			logger.debug("\(event)")
+			logger.debug("Did receive Server Event (id: \(event.id)): \(event.caseName)")
 		}
 
 		switch event {
@@ -394,23 +411,32 @@ private extension Conversation {
 			isModelSpeaking = false
 			playingItemID = nil
 		case .outputAudioBufferCleared:
-			// Audio buffer cleared; stop timing and reset counters
+			/// Audio buffer cleared; stop timing and reset counters
+			/*
 			if let start = modelAudioStartDate {
 				modelAudioAccumulatedMs += Int(Date().timeIntervalSince(start) * 1000.0)
 			}
+			*/
 			modelAudioStartDate = nil
 			modelAudioAccumulatedMs = 0
 			/// Audio buffer was cleared, model is no longer speaking
 			isModelSpeaking = false
 			playingItemID = nil
+			
+			/*
+			/// If was interrupting the model – turn output audio back on
+			if !audioOutputEnabled {
+				audioOutputEnabled = true
+			}
+			*/
 		case let .responseOutputItemDone(_, _, _, item):
 			updateEvent(id: item.id) { message in
 				guard case let .message(newMessage) = item else { return }
-
 				message = newMessage
 			}
+		case let .conversationItemTruncated(_, itemId, _, _):
 			/// If the completed item is the one we were tracking as playing, clear it
-			if playingItemID == item.id {
+			if playingItemID == itemId {
 				playingItemID = nil
 			}
 			
@@ -419,10 +445,19 @@ private extension Conversation {
 				modelAudioAccumulatedMs += Int(Date().timeIntervalSince(start) * 1000.0)
 			}
 			modelAudioStartDate = nil
+			
+			// isModelSpeaking = false
+		/*
+		case let .responseOutputAudioDone(eventId, responseId, itemId, outputIndex, contentIndex):
+			/// If was interrupting the model – turn output audio back on
+			if !audioOutputEnabled {
+				audioOutputEnabled = true
+			}
+		*/
 		case .conversationItemRetrieved,
 			 .conversationItemInputAudioTranscriptionDelta,
 			 .conversationItemInputAudioTranscriptionSegment,
-			 .conversationItemTruncated,
+			 // .conversationItemTruncated,
 			 .inputAudioBufferCommitted,
 			 .inputAudioBufferCleared,
 			 .inputAudioBufferTimeoutTriggered,
@@ -438,7 +473,7 @@ private extension Conversation {
 			 .responseMCPCallCompleted,
 			 .responseMCPCallFailed,
 			 .rateLimitsUpdated:
-			logger.warning("Unhandled server event: \(event)")
+			logger.warning("Unhandled server event `\(event.caseName)`:\n\(event)")
 		}
 	}
 	
@@ -458,15 +493,13 @@ private extension Conversation {
 		}
 		
 		for entry in entries.reversed() {
-			guard case let .message(message) = entry else { continue }
-			let hasAudio = message.content.contains { part in
-				if case .audio = part {
-					return true
-				}
-				return false
-			}
-			if hasAudio {
+			if case let .message(message) = entry,
+			   message.role == .assistant,
+			   message.content.contains(where: \.isAudio)
+			{
 				return message.id
+			} else {
+				continue
 			}
 		}
 		
