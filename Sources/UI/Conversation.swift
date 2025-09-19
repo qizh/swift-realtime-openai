@@ -81,7 +81,10 @@ public final class Conversation: @unchecked Sendable {
 	
 	// MARK: ┣ init
 	
-	public required init(debug: Bool = false, configuring sessionUpdateCallback: SessionUpdateCallback? = nil) {
+	public required init(
+		debug: Bool = false,
+		configuring sessionUpdateCallback: SessionUpdateCallback? = nil
+	) {
 		self.debug = debug
 		client = try! WebRTCConnector.create()
 		self.sessionUpdateCallback = sessionUpdateCallback
@@ -163,61 +166,61 @@ public final class Conversation: @unchecked Sendable {
 	
 	// MARK: ┗ Interrupt
 	
-        /// Interrupt the model's response if it's currently playing.
-        /// This lets the model know that the user didn't hear the full response.
-        public func interruptSpeech() {
-                guard !isInterrupting else { return }
-                isInterrupting = true
-                defer { isInterrupting = false }
-
-                /// Calculate how much audio has already played (in milliseconds) using wall-clock
-                /// timing. Since `LKRTCAudioTrack` doesn't expose playback time, we track from
-                /// output buffer events.
-                let currentPlayerTimeMs: Int = {
-                        var ms = modelAudioAccumulatedMs
-                        if let start = modelAudioStartDate {
-                                ms += Int(Date().timeIntervalSince(start) * 1000.0)
-                        }
-                        return ms
-                }()
-
-                /// Determine which item is currently playing.
-                let itemIDToTruncate: String? = currentlyPlayingAudioItemID()
-
-                if isModelSpeaking, let itemIDToTruncate {
-                        do {
-                                try client.send(
-                                        event: .truncateConversationItem(
-                                                forItem: itemIDToTruncate,
-                                                atAudioMs: currentPlayerTimeMs
-                                        )
-                                )
-                        } catch {
-                                /// Convert any thrown error into a ServerError and emit it
-                                let nse = error as NSError
-                                let se = ServerError(
-                                        type: String(describing: type(of: error)),
-                                        code: "\(nse.code)",
-                                        message: "\(error.localizedDescription)\n\(error)",
-                                        param: "\(nse.userInfo)",
-                                        eventId: .init(randomLength: 16)
-                                )
-
-                                print("""
-                                        Failed to send truncateConversationItem event
-                                        ┣ error: \(error)
-                                        ┗ server error: \(se)
-                                        """)
-                                errorStream.yield(se)
-                        }
-                }
-
-                modelAudioAccumulatedMs = currentPlayerTimeMs
-                modelAudioStartDate = nil
-                playingItemID = nil
-                isModelSpeaking = false
-                muted = false
-        }
+	/// Interrupt the model's response if it's currently playing.
+	/// This lets the model know that the user didn't hear the full response.
+	public func interruptSpeech() {
+		guard !isInterrupting else { return }
+		isInterrupting = true
+		defer { isInterrupting = false }
+		
+		/// Calculate how much audio has already played (in milliseconds) using wall-clock
+		/// timing. Since `LKRTCAudioTrack` doesn't expose playback time, we track from
+		/// output buffer events.
+		let currentPlayerTimeMs: Int = {
+			var ms = modelAudioAccumulatedMs
+			if let start = modelAudioStartDate {
+				ms += Int(Date().timeIntervalSince(start) * 1000.0)
+			}
+			return ms
+		}()
+		
+		/// Determine which item is currently playing.
+		let itemIDToTruncate: String? = currentlyPlayingAudioItemID()
+		
+		if isModelSpeaking, let itemIDToTruncate {
+			do {
+				try client.send(
+					event: .truncateConversationItem(
+						forItem: itemIDToTruncate,
+						atAudioMs: currentPlayerTimeMs
+					)
+				)
+			} catch {
+				/// Convert any thrown error into a ServerError and emit it
+				let nse = error as NSError
+				let se = ServerError(
+					type: String(describing: type(of: error)),
+					code: "\(nse.code)",
+					message: "\(error.localizedDescription)\n\(error)",
+					param: "\(nse.userInfo)",
+					eventId: .init(randomLength: 16)
+				)
+				
+				print("""
+					Failed to send truncateConversationItem event
+					┣ error: \(error)
+					┗ server error: \(se)
+					""")
+				errorStream.yield(se)
+			}
+		}
+		
+		modelAudioAccumulatedMs = currentPlayerTimeMs
+		modelAudioStartDate = nil
+		playingItemID = nil
+		isModelSpeaking = false
+		muted = false
+	}
 	
 	// MARK: - Send
 	
@@ -247,8 +250,22 @@ public final class Conversation: @unchecked Sendable {
 	
 	/// Send a text message and wait for a response.
 	/// Optionally, you can provide a response configuration to customize the model's behavior.
-	public func send(from role: Item.Message.Role, text: String, response: Response.Config? = nil) throws {
-		try send(event: .createConversationItem(.message(Item.Message(id: String(randomLength: 32), role: role, content: [.inputText(text)]))))
+	public func send(
+		from role: Item.Message.Role,
+		text: String,
+		response: Response.Config? = nil
+	) throws {
+		try send(
+			event: .createConversationItem(
+				.message(
+					Item.Message(
+						id: String(randomLength: 32),
+						role: role,
+						content: [.inputText(text)]
+					)
+				)
+			)
+		)
 		try send(event: .createResponse(using: response))
 	}
 
@@ -256,7 +273,11 @@ public final class Conversation: @unchecked Sendable {
 	
 	/// Send the response of a function call.
 	public func send(result output: Item.FunctionCallOutput) throws {
-		try send(event: .createConversationItem(.functionCallOutput(output)))
+		try send(
+			event: .createConversationItem(
+				.functionCallOutput(output)
+			)
+		)
 	}
 }
 
@@ -281,7 +302,7 @@ private extension Conversation {
 		case let .conversationItemAdded(_, item, _):
 			entries.append(item)
 		case let .conversationItemDone(_, item, _):
-			// Update the existing item with the completed version
+			/// Update the existing item with the completed version
 			if let index = entries.firstIndex(where: { $0.id == item.id }) {
 				entries[index] = item
 			}
@@ -413,54 +434,54 @@ private extension Conversation {
 		}
 	}
 	
-        // MARK: ┗ Update
-
-        /// Returns the identifier of the item that is currently playing audio (if known).
-        ///
-        /// If no actively playing item is being tracked, this method falls back to the most
-        /// recent message entry that includes audio content, allowing features like
-        /// ``interruptSpeech()`` to address the correct conversation item.
-        ///
-        /// - Returns: The identifier of the item producing audio output, or `nil` when none
-        ///   can be determined.
-        func currentlyPlayingAudioItemID() -> String? {
-                if let playingItemID {
-                        return playingItemID
-                }
-
-                for entry in entries.reversed() {
-                        guard case let .message(message) = entry else { continue }
-                        let hasAudio = message.content.contains { part in
-                                if case .audio = part {
-                                        return true
-                                }
-                                return false
-                        }
-                        if hasAudio {
-                                return message.id
-                        }
-                }
-
-                return nil
-        }
-
-        func updateEvent(id: String, modifying closure: (inout Item.Message) -> Void) {
-                guard let index = entries.firstIndex(where: { $0.id == id }), case var .message(message) = entries[index] else {
-                        return
-                }
-
-                closure(&message)
-
-                entries[index] = .message(message)
-        }
-
-        func updateEvent(id: String, modifying closure: (inout Item.FunctionCall) -> Void) {
-                guard let index = entries.firstIndex(where: { $0.id == id }), case var .functionCall(functionCall) = entries[index] else {
-                        return
-                }
-
-                closure(&functionCall)
-
-                entries[index] = .functionCall(functionCall)
-        }
+	// MARK: ┗ Update
+	
+	/// Returns the identifier of the item that is currently playing audio (if known).
+	///
+	/// If no actively playing item is being tracked, this method falls back to the most
+	/// recent message entry that includes audio content, allowing features like
+	/// ``interruptSpeech()`` to address the correct conversation item.
+	///
+	/// - Returns: The identifier of the item producing audio output, or `nil` when none
+	///   can be determined.
+	func currentlyPlayingAudioItemID() -> String? {
+		if let playingItemID {
+			return playingItemID
+		}
+		
+		for entry in entries.reversed() {
+			guard case let .message(message) = entry else { continue }
+			let hasAudio = message.content.contains { part in
+				if case .audio = part {
+					return true
+				}
+				return false
+			}
+			if hasAudio {
+				return message.id
+			}
+		}
+		
+		return nil
+	}
+	
+	func updateEvent(id: String, modifying closure: (inout Item.Message) -> Void) {
+		guard let index = entries.firstIndex(where: { $0.id == id }),
+			  case var .message(message) = entries[index]
+		else { return }
+		
+		closure(&message)
+		
+		entries[index] = .message(message)
+	}
+	
+	func updateEvent(id: String, modifying closure: (inout Item.FunctionCall) -> Void) {
+		guard let index = entries.firstIndex(where: { $0.id == id }),
+			  case var .functionCall(functionCall) = entries[index]
+		else { return }
+		
+		closure(&functionCall)
+		
+		entries[index] = .functionCall(functionCall)
+	}
 }
