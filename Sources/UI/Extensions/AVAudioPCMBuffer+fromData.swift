@@ -1,11 +1,13 @@
 import AVFoundation
+import Helpers
 
 extension AVAudioPCMBuffer {
 	static func fromData(_ data: Data, format: AVAudioFormat) -> AVAudioPCMBuffer? {
 		let frameCount = UInt32(data.count) / format.streamDescription.pointee.mBytesPerFrame
-
+		let logger = Log.create(category: "Audio PCM Buffer")
+		
 		guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frameCount) else {
-			print("Error: Failed to create AVAudioPCMBuffer")
+			logger.error("Failed to create AVAudioPCMBuffer")
 			return nil
 		}
 
@@ -14,7 +16,7 @@ extension AVAudioPCMBuffer {
 
 		data.withUnsafeBytes { bufferPointer in
 			guard let address = bufferPointer.baseAddress else {
-				print("Error: Failed to get base address of data")
+				logger.error("Failed to get base address of data")
 				return
 			}
 
