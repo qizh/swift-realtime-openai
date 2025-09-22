@@ -479,31 +479,56 @@ private extension Conversation {
 	
 	// MARK: ┗ Update
 	
-	/// Returns the identifier of the item that is currently playing audio (if known).
+	/// Returns the identifier of the conversation item whose audio is currently being
+	/// produced.
 	///
-	/// If no actively playing item is being tracked, this method falls back to the most
-	/// recent message entry that includes audio content, allowing features like
-	/// ``interruptSpeech()`` to address the correct conversation item.
+	/// - Behavior:
+	/// + Primary source: If `playingItemID` is set (populated from
+	///   `.responseOutputAudioDelta` events), that value is returned directly.
+	/// + Fallback scan: If no actively playing item is tracked yet, this method scans
+	///   `entries` from newest to oldest for the most recent assistant message that contains
+	///   audio content and returns its `id`.
+	/// + Early-interrupt support: If no audio parts have arrived yet, the method returns the
+	///   most recent assistant message `id` (if any) so that features like
+	///   `interruptSpeech()` can target the correct item before audio chunks are received.
 	///
-	/// - Returns: The identifier of the item producing audio output, or `nil` when none
-	///   can be determined.
+	/// - Notes:
+	/// + This method does not mutate state and has no side effects.
+	/// + Time complexity is O(n) in the number of `entries` in the worst case due to the
+	///   reverse scan.
+	/// + `Conversation` is annotated with `@MainActor`, so call this on the main thread.
+	///
+	/// - Usage:
+	/// + Used by ``interruptSpeech()`` to determine which item to truncate when the user
+	///   interrupts model speech.
+	///
+	/// - Returns: The identifier of the item producing (or about to produce) audio output,
+	///   or `nil` if no suitable assistant message can be determined.
 	func currentlyPlayingAudioItemID() -> String? {
 		if let playingItemID {
 			return playingItemID
 		}
 		
+		var mostRecentAssistantMessageID: String?
+		
 		for entry in entries.reversed() {
-			if case let .message(message) = entry,
-			   message.role == .assistant,
-			   message.content.contains(where: \.isAudio)
-			{
+			guard case let .message(message) = entry,
+				  message.role == .assistant
+			else { continue }
+			
+			if message.content.contains(where: \.isAudio) {
 				return message.id
-			} else {
-				continue
+			}
+			
+			if mostRecentAssistantMessageID == nil {
+				/// Return the most recent assistant message when no audio chunks
+				/// have been received yet, ensuring interrupts still target
+				/// the active item before audio arrives.
+				mostRecentAssistantMessageID = message.id
 			}
 		}
 		
-		return nil
+		return mostRecentAssistantMessageID
 	}
 	
 	func updateEvent(id: String, modifying closure: (inout Item.Message) -> Void) {
