@@ -172,8 +172,46 @@ public final class Conversation: @unchecked Sendable {
 	
 	// MARK: ┗ Interrupt
 	
-	/// Interrupt the model's response if it's currently playing.
-	/// This lets the model know that the user didn't hear the full response.
+	/// Interrupts the model's currently playing audio response and requests truncation of
+	/// the active conversation item at the current playback position.
+	///
+	/// # Behavior
+	/// - Preconditions: Returns immediately if the model isn't speaking
+	///   (`isModelSpeaking == false`) or if an interruption is already in progress
+	///   (`isInterrupting == true`).
+	/// - Timing: Computes the current playback time in milliseconds based on wall-clock
+	///   timing from output audio buffer events (`modelAudioStartDate` and
+	///   `modelAudioAccumulatedMs`).
+	/// - Target selection: Determines the relevant conversation item via
+	///   `currentlyPlayingAudioItemID()`.
+	/// - Server coordination: Sends a sequence of events to the server to stop and clear
+	///   playback:
+	///   1) `.truncateConversationItem(forItem:atAudioMs:)` — truncate the active item at
+	///      the computed playback time.
+	///   2) `.cancelResponse()` — cancel any in-flight response generation.
+	///   3) `.outputAudioBufferClear()` — clear any remaining audio buffered for output.
+	///
+	/// # Side effects
+	/// - Sets ``isInterrupting`` to true for the duration of the operation (using `defer` to
+	///   reset).
+	/// - Updates playback timing state: persists `modelAudioAccumulatedMs`, clears
+	///   `modelAudioStartDate`.
+	/// - Clears `playingItemID` so subsequent playback tracking starts fresh.
+	/// - Does not modify ``audioOutputEnabled``, ``isModelSpeaking``, or ``muted``
+	///   (see commented lines for potential future behavior adjustments).
+	///
+	/// # Error handling
+	/// - Any error thrown while sending interruption events is captured, converted into a
+	///   `ServerError`, logged, and yielded on the `errors` stream so callers can observe
+	///   failures.
+	///
+	/// # Threading
+	/// - `Conversation` is `@MainActor`; call this on the main thread.
+	///
+	/// # Usage
+	/// - Call when the user speaks over or otherwise requests to skip the remainder of the
+	///   model's speech. This helps the model adapt to barge-in scenarios and reduces
+	///   latency by halting generation and playback.
 	public func interruptSpeech() {
 		guard isModelSpeaking,
 			  !isInterrupting else { return }
