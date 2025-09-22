@@ -381,12 +381,12 @@ public final class Conversation: @unchecked Sendable {
 /// Event handling private API
 private extension Conversation {
 	func handleEvent(_ event: ServerEvent) throws {
-		if debug { logger.debug("Did receive Server Event (id: \(event.id)): \(event.caseName)") }
+		if debug { logger.debug("Did receive ServerEvent.\(event.caseName)(id: \(event.id))\n\(event)") }
 		
 		switch event {
 		case let .error(_, error):
 			errorStream.yield(error)
-			logger.warning("Received error: \(error)")
+			if debug { logger.warning("Received error: \(error)") }
 		case let .sessionCreated(_, session):
 			self.session = session
 			if let sessionUpdateCallback { try updateSession(withChanges: sessionUpdateCallback) }
