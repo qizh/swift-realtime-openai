@@ -19,7 +19,7 @@ package struct Log {
 		Logger(subsystem: subsystem, category: category)
 	}
 	#else
-	package static func create(category: String) -> Logger {
+	package static func create(category: String) -> PrintLogger {
 		PrintLogger(subsystem: subsystem, category: category)
 	}
 	#endif
