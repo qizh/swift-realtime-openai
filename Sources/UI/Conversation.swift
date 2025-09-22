@@ -12,9 +12,11 @@ public enum ConversationError: Error {
 	case converterInitializationFailed
 }
 
+/// Callback to mutate the session before sending updates.
+public typealias SessionUpdateCallback = (inout Session) -> Void
+
 @MainActor @Observable
 public final class Conversation: @unchecked Sendable {
-	public typealias SessionUpdateCallback = (inout Session) -> Void
 	
 	private let client: WebRTCConnector
 	private var task: Task<Void, Error>!
@@ -53,6 +55,7 @@ public final class Conversation: @unchecked Sendable {
 	/// A list of items in the conversation.
 	public private(set) var entries: [Item] = []
 
+	/// Current WebRTC connection status.
 	public var status: RealtimeAPI.Status {
 		client.status
 	}
@@ -84,6 +87,7 @@ public final class Conversation: @unchecked Sendable {
 	
 	// MARK: ┣ init
 	
+	/// Initialize a conversation with optional debug and session configuration.
 	public required init(
 		debug: Bool = false,
 		configuring sessionUpdateCallback: SessionUpdateCallback? = nil
@@ -121,12 +125,15 @@ public final class Conversation: @unchecked Sendable {
 	
 	// MARK: ┣ Connection
 	
+	/// Connect using a prepared URLRequest (WebRTC).
 	public func connect(using request: URLRequest) async throws {
 		await AVAudioApplication.requestRecordPermission()
 
 		try await client.connect(using: request)
 	}
 
+	/// Connect with an ephemeral key and model;
+	/// maps invalid keys to ``ConversationError/invalidEphemeralKey``.
 	public func connect(ephemeralKey: String, model: Model = .gptRealtime) async throws {
 		do {
 			try await connect(using: .webRTCConnectionRequest(ephemeralKey: ephemeralKey, model: model))
@@ -152,7 +159,9 @@ public final class Conversation: @unchecked Sendable {
 	// MARK: ┣ Session
 	
 	/// Make changes to the current session
-	/// Note that this will fail if the session hasn't started yet. Use `whenConnected` to ensure the session is ready.
+	///
+	/// - Note: This will fail if the session hasn't started yet. Use `whenConnected` to
+	/// ensure the session is ready.
 	public func updateSession(withChanges callback: (inout Session) throws -> Void) throws {
 		guard var session else { throw ConversationError.sessionNotFound }
 
@@ -163,7 +172,7 @@ public final class Conversation: @unchecked Sendable {
 
 	/// Set the configuration of the current session
 	public func setSession(_ session: Session) throws {
-		// update endpoint errors if we include the session id
+		/// update endpoint errors if we include the session id
 		var session = session
 		session.id = nil
 
@@ -213,15 +222,16 @@ public final class Conversation: @unchecked Sendable {
 	///   model's speech. This helps the model adapt to barge-in scenarios and reduces
 	///   latency by halting generation and playback.
 	public func interruptSpeech() {
+		/// Ignore if the model isn't speaking or an interruption is already in progress.
 		guard isModelSpeaking,
 			  !isInterrupting else { return }
 		
+		/// Mark interruption in progress.
 		isInterrupting = true
+		/// Ensure the flag resets when this function exits.
 		defer { isInterrupting = false }
 		
-		/// Calculate how much audio has already played (in milliseconds).
-		/// Since `LKRTCAudioTrack` doesn't expose playback time, we track from
-		/// output buffer events.
+		/// Compute current playback position (ms) from wall-clock timing.
 		let currentPlayerTimeMs: Int = {
 			var ms = modelAudioAccumulatedMs
 			if let start = modelAudioStartDate {
@@ -230,33 +240,50 @@ public final class Conversation: @unchecked Sendable {
 			return ms
 		}()
 		
-		/// Determine which item is currently playing.
+		// Identify the target item to truncate (currently playing or most recent assistant).
 		if let itemIDToTruncate = currentlyPlayingAudioItemID() {
 			do {
-				logger.debug("""
-					Sending `truncateConversationItem` event
-					┣ for item: \(itemIDToTruncate)
-					┗ at audio ms: \(currentPlayerTimeMs)
-					""")
+				if debug {
+					logger.debug("""
+						Sending `truncateConversationItem` event
+						┣ for item: \(itemIDToTruncate)
+						┗ at audio ms: \(currentPlayerTimeMs)
+						""")
+				}
+
+				/// Request truncation at the current playback offset.
 				try client.send(
 					event: .truncateConversationItem(
 						forItem: itemIDToTruncate,
 						atAudioMs: currentPlayerTimeMs
 					)
 				)
-				logger.debug("""
-					Did send `truncateConversationItem` event
-					┣ for item: \(itemIDToTruncate)
-					┗ at audio ms: \(currentPlayerTimeMs)
-					""")
-				logger.debug("Sending `cancelResponse` event")
+				
+				if debug {
+					logger.debug("""
+						Did send `truncateConversationItem` event
+						┣ for item: \(itemIDToTruncate)
+						┗ at audio ms: \(currentPlayerTimeMs)
+						""")
+					logger.debug("Sending `cancelResponse` event")
+				}
+				
+				/// Cancel any in-flight response generation.
 				try client.send(event: .cancelResponse())
-				logger.debug("Did send `cancelResponse` event")
-				logger.debug("Sending `outputAudioBufferClear` event")
+				
+				if debug {
+					logger.debug("Did send `cancelResponse` event")
+					logger.debug("Sending `outputAudioBufferClear` event")
+				}
+				
+				/// Clear any remaining buffered output audio.
 				try client.send(event: .outputAudioBufferClear())
-				logger.debug("Did send `outputAudioBufferClear` event")
+				
+				if debug {
+					logger.debug("Did send `outputAudioBufferClear` event")
+				}
 			} catch {
-				/// Convert any thrown error into a ServerError and emit it
+				/// Report failure as ServerError via the errors stream.
 				let nse = error as NSError
 				let se = ServerError(
 					type: String(describing: type(of: error)),
@@ -266,15 +293,18 @@ public final class Conversation: @unchecked Sendable {
 					eventId: .init(randomLength: 16)
 				)
 				
-				logger.error("""
-					Failed to send one of the interruption events
-					┣ error: \(error)
-					┗ server error: \(se)
-					""")
+				if debug {
+					logger.error("""
+						Failed to send one of the interruption events
+						┣ error: \(error)
+						┗ server error: \(se)
+						""")
+				}
 				errorStream.yield(se)
 			}
 		}
 		
+		// Persist elapsed ms, stop timing, and reset active playing item.
 		modelAudioAccumulatedMs = currentPlayerTimeMs
 		modelAudioStartDate = nil
 		playingItemID = nil
@@ -290,8 +320,9 @@ public final class Conversation: @unchecked Sendable {
 	// MARK: ┣ Client Event
 	
 	/// Send a client event to the server.
+	///
 	/// - Warning: This function is intended for advanced use cases.
-	/// Use the other functions to send messages and audio data.
+	/// 	Use the other functions to send messages and audio data.
 	public func send(event: ClientEvent) throws {
 		try client.send(event: event)
 	}
@@ -299,9 +330,12 @@ public final class Conversation: @unchecked Sendable {
 	// MARK: ┣ Audio Delta
 	
 	/// Manually append audio bytes to the conversation.
+	///
 	/// Commit the audio to trigger a model response when server turn detection is disabled.
-	/// > Note: The `Conversation` class can automatically handle listening to the user's mic and playing back model responses.
-	/// > To get started, call the `startListening` function.
+	///
+	/// - Note: The `Conversation` class can automatically handle listening to the user's mic
+	/// 	and playing back model responses.
+	/// 	To get started, call the `startListening` function.
 	public func send(audioDelta audio: Data, commit: Bool = false) throws {
 		try send(event: .appendInputAudioBuffer(encoding: audio))
 		if commit { try send(event: .commitInputAudioBuffer()) }
@@ -347,10 +381,8 @@ public final class Conversation: @unchecked Sendable {
 /// Event handling private API
 private extension Conversation {
 	func handleEvent(_ event: ServerEvent) throws {
-		if debug {
-			logger.debug("Did receive Server Event (id: \(event.id)): \(event.caseName)")
-		}
-
+		if debug { logger.debug("Did receive Server Event (id: \(event.id)): \(event.caseName)") }
+		
 		switch event {
 		case let .error(_, error):
 			errorStream.yield(error)
@@ -379,7 +411,7 @@ private extension Conversation {
 			}
 		case let .conversationItemInputAudioTranscriptionFailed(_, _, _, error):
 			errorStream.yield(error)
-			logger.warning("Received error: \(error)")
+			if debug { logger.warning("Received error: \(error)") }
 		case let .responseCreated(_, response):
 			if id == nil {
 				id = response.conversationId
@@ -450,23 +482,11 @@ private extension Conversation {
 			playingItemID = nil
 		case .outputAudioBufferCleared:
 			/// Audio buffer cleared; stop timing and reset counters
-			/*
-			if let start = modelAudioStartDate {
-				modelAudioAccumulatedMs += Int(Date().timeIntervalSince(start) * 1000.0)
-			}
-			*/
 			modelAudioStartDate = nil
 			modelAudioAccumulatedMs = 0
 			/// Audio buffer was cleared, model is no longer speaking
 			isModelSpeaking = false
 			playingItemID = nil
-			
-			/*
-			/// If was interrupting the model – turn output audio back on
-			if !audioOutputEnabled {
-				audioOutputEnabled = true
-			}
-			*/
 		case let .responseOutputItemDone(_, _, _, item):
 			updateEvent(id: item.id) { message in
 				guard case let .message(newMessage) = item else { return }
@@ -483,19 +503,9 @@ private extension Conversation {
 				modelAudioAccumulatedMs += Int(Date().timeIntervalSince(start) * 1000.0)
 			}
 			modelAudioStartDate = nil
-			
-			// isModelSpeaking = false
-		/*
-		case let .responseOutputAudioDone(eventId, responseId, itemId, outputIndex, contentIndex):
-			/// If was interrupting the model – turn output audio back on
-			if !audioOutputEnabled {
-				audioOutputEnabled = true
-			}
-		*/
 		case .conversationItemRetrieved,
 			 .conversationItemInputAudioTranscriptionDelta,
 			 .conversationItemInputAudioTranscriptionSegment,
-			 // .conversationItemTruncated,
 			 .inputAudioBufferCommitted,
 			 .inputAudioBufferCleared,
 			 .inputAudioBufferTimeoutTriggered,
@@ -511,7 +521,7 @@ private extension Conversation {
 			 .responseMCPCallCompleted,
 			 .responseMCPCallFailed,
 			 .rateLimitsUpdated:
-			logger.warning("Unhandled server event `\(event.caseName)`:\n\(event)")
+			if debug { logger.warning("Unhandled server event `\(event.caseName)`:\n\(event)") }
 		}
 	}
 	
