@@ -49,6 +49,7 @@ public struct ServerError: Codable, Equatable, Sendable {
 extension ServerError: CustomStringConvertible {
 	public var description: String {
 		let parameters: String = [
+			"type": type,
 			"code": code,
 			"message": message,
 			"param": param,
@@ -63,6 +64,6 @@ extension ServerError: CustomStringConvertible {
 		}
 		.joined(separator: ", ")
 		
-		return "\(type)(\(parameters))"
+		return "ServerError(\(parameters))"
 	}
 }
