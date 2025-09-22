@@ -544,6 +544,17 @@ public enum ServerEvent: Sendable {
 	case rateLimitsUpdated(eventId: String, rateLimits: [RateLimit])
 }
 
+extension ServerEvent: CustomStringConvertible {
+	public var description: String {
+		if let data = try? JSONEncoder().encode(self),
+		   let string = String(data: data, encoding: .utf8) {
+			string
+		} else {
+			caseName
+		}
+	}
+}
+
 extension ServerEvent: Identifiable {
 	public var id: String {
 		switch self {
