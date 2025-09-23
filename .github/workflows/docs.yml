@@ -1,9 +1,7 @@
 name: Docs
 
 on:
-  push:
-    tags: ['*']
-    branches: [main]
+  workflow_dispatch: {}
 
 jobs:
   build:
@@ -11,8 +9,8 @@ jobs:
     strategy:
       matrix:
         swift: ['6.0', '6.1', '6.2']
-      exclude:
-        - swift: '6.2'
+        exclude:
+          - swift: '6.2'
     steps:
       - uses: swift-actions/setup-swift@v2
         with:
