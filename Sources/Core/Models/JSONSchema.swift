@@ -40,11 +40,31 @@ public indirect enum JSONSchema: Sendable {
 	///   - schemas: The candidate schemas.
 	///   - description: Optional human-readable description.
 	case anyOf(_ schemas: [JSONSchema], description: String? = nil)
+	/// Convenience overload of `.anyOf` that accepts a variadic list of schemas.
+	/// - Parameters:
+	///   - schemas: One or more candidate schemas to validate against.
+	///   - description: Optional human-readable description for the composed schema.
+	/// - Returns: An `.anyOf` schema that matches if the instance validates against
+	/// 	any of the provided schemas.
+	@inlinable public static func anyOf(
+		_ schemas: JSONSchema...,
+		description: String? = nil
+	) -> Self {
+		.anyOf(schemas, description: description)
+	}
 	/// A schema for a string value limited to the given enumeration of cases.
 	/// - Parameters:
 	///   - cases: Allowed string values.
 	///   - description: Optional human-readable description.
 	case `enum`(cases: [String], description: String? = nil)
+	/// Convenience overload of `.enum` that accepts a variadic list of string cases.
+	/// - Parameters:
+	///   - cases: One or more allowed string values.
+	///   - description: Optional human-readable description for the enum schema.
+	/// - Returns: An `.enum` string schema restricted to the provided cases.
+	@inlinable public static func `enum`(cases: String..., description: String? = nil) -> Self {
+		.enum(cases: cases, description: description)
+	}
 	/// A schema describing a JSON object with named properties and constraints.
 	/// - Parameters:
 	///   - properties: Map of property names to their schemas.
@@ -719,3 +739,4 @@ extension JSONSchema: Codable {
 		}
 	}
 }
+
