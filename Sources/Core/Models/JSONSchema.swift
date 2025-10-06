@@ -1,45 +1,31 @@
 import QizhMacroKit
 
+// MARK: JSON Schema
+
 /// Represents a JSON Schema for validating JSON data structures.
 @IsCase @CaseName @CaseValue
 public indirect enum JSONSchema: Sendable {
-	/// Well-known formats for string schemas, following common JSON Schema conventions.
-	@IsCase
-	public enum StringFormat: String, Codable, Hashable, Sendable, CaseIterable {
-		/// IPv4 address (e.g., 192.168.0.1)
-		case ipv4
-		/// IPv6 address (e.g., ::1)
-		case ipv6
-		/// Universally unique identifier
-		case uuid
-		/// Calendar date in RFC 3339 full-date format
-		case date
-		/// Time of day in RFC 3339 full-time format
-		case time
-		/// Email address
-		case email
-		/// Duration in ISO 8601 format
-		case duration
-		/// DNS hostname
-		case hostname
-		/// Date and time in RFC 3339 date-time format
-		case dateTime = "date-time"
-	}
-	
 	/// Convenience map of property name to its JSON schema.
 	public typealias ObjectProperties = [String: JSONSchema]
-
+		
+	// MARK: ┣ null
 	/// A schema that matches the JSON null value.
 	/// - Parameter description: Optional human-readable description.
 	case null(description: String? = nil)
+	
+	// MARK: ┣ boolean
 	/// A schema that matches a boolean value (true/false).
 	/// - Parameter description: Optional human-readable description.
 	case boolean(description: String? = nil)
+	
+	// MARK: ┣ any of
 	/// A schema that matches if the instance validates against any of the provided schemas.
 	/// - Parameters:
 	///   - schemas: The candidate schemas.
 	///   - description: Optional human-readable description.
 	case anyOf(_ schemas: [JSONSchema], description: String? = nil)
+	
+	// MARK: ┃┗ any of +⃣ helper
 	/// Convenience overload of `.anyOf` that accepts a variadic list of schemas.
 	/// - Parameters:
 	///   - schemas: One or more candidate schemas to validate against.
@@ -52,19 +38,28 @@ public indirect enum JSONSchema: Sendable {
 	) -> Self {
 		.anyOf(schemas, description: description)
 	}
+	
+	// MARK: ┣ enum
 	/// A schema for a string value limited to the given enumeration of cases.
 	/// - Parameters:
 	///   - cases: Allowed string values.
 	///   - description: Optional human-readable description.
 	case `enum`(cases: [String], description: String? = nil)
-	/// Convenience overload of `.enum` that accepts a variadic list of string cases.
+	
+	// MARK: ┃┗ enum +⃣ helper
+	/// Convenience overload of ``enum(cases:description:)-enum.case``
+	/// that accepts a variadic list of string cases.
+	///
 	/// - Parameters:
 	///   - cases: One or more allowed string values.
 	///   - description: Optional human-readable description for the enum schema.
-	/// - Returns: An `.enum` string schema restricted to the provided cases.
+	/// - Returns: An ``enum(cases:description:)-enum.case`` string schema
+	/// 			restricted to the provided cases.
 	@inlinable public static func `enum`(cases: String..., description: String? = nil) -> Self {
 		.enum(cases: cases, description: description)
 	}
+	
+	// MARK: ┣ object
 	/// A schema describing a JSON object with named properties and constraints.
 	/// - Parameters:
 	///   - properties: Map of property names to their schemas.
@@ -83,6 +78,52 @@ public indirect enum JSONSchema: Sendable {
 		defaultValue: JSONValue? = nil,
 		examples: [JSONValue]? = nil
 	)
+	
+	// MARK: ┃┗ object +⃣ helper
+	/// Convenience overload of
+	/// ``object(properties:required:additionalProperties:description:title:defaultValue:examples:)-enum.case``
+	/// using keys that are `RawRepresentable` with `String` raw values
+	/// (e.g., string-backed enums).
+	///
+	/// Converts keys and required names to `String` and forwards to
+	/// ``object(properties:required:additionalProperties:description:title:defaultValue:examples:)-enum.case``.
+	///
+	/// - Parameters:
+	///   - properties: Map of typed keys to their schemas.
+	///   - required: Keys that are required on the object.
+	///   - additionalProperties: Schema for additional properties not listed in `properties`.
+	///   - description: Optional human-readable description.
+	///   - title: Optional display title.
+	///   - defaultValue: Optional default value.
+	///   - examples: Optional example values.
+	/// - Returns: An `.object` schema with string keys.
+	@inlinable public static func object<K>(
+		properties: [K: JSONSchema],
+		required: [K]? = nil,
+		additionalProperties: JSONSchema? = nil,
+		description: String? = nil,
+		title: String? = nil,
+		defaultValue: JSONValue? = nil,
+		examples: [JSONValue]? = nil
+	) -> Self where K: RawRepresentable,
+					K.RawValue == String
+	{
+		.object(
+			properties: .init(
+				uniqueKeysWithValues: properties.map { element in
+					(element.key.rawValue, element.value)
+				}
+			),
+			required: required?.map(\.rawValue),
+			additionalProperties: additionalProperties,
+			description: description,
+			title: title,
+			defaultValue: defaultValue,
+			examples: examples
+		)
+	}
+	
+	// MARK: ┣ string
 	/// A schema describing a string value, optionally constrained by pattern and format.
 	/// - Parameters:
 	///   - pattern: Regular expression the string must match.
@@ -99,6 +140,8 @@ public indirect enum JSONSchema: Sendable {
 		defaultValue: String? = nil,
 		examples: [String]? = nil
 	)
+	
+	// MARK: ┣ array
 	/// A schema describing an array of items of a given schema, with optional length bounds.
 	/// - Parameters:
 	///   - of: Schema for each array element.
@@ -117,6 +160,8 @@ public indirect enum JSONSchema: Sendable {
 		defaultValue: [JSONValue]? = nil,
 		examples: [[JSONValue]]? = nil
 	)
+	
+	// MARK: ┣ number
 	/// A schema describing a numeric (floating-point) value with optional numeric constraints.
 	/// - Parameters:
 	///   - multipleOf: Value must be a multiple of this integer.
@@ -139,6 +184,8 @@ public indirect enum JSONSchema: Sendable {
 		defaultValue: Double? = nil,
 		examples: [Double]? = nil
 	)
+	
+	// MARK: ┣ integer
 	/// A schema describing an integer value with optional numeric constraints.
 	/// - Parameters:
 	///   - multipleOf: Value must be a multiple of this integer.
@@ -161,8 +208,13 @@ public indirect enum JSONSchema: Sendable {
 		defaultValue: Int? = nil,
 		examples: [Int]? = nil
 	)
+}
+
+// MARK: +⃣ Description
+
+extension JSONSchema {
 	
-	// MARK: — description accessor
+	// MARK: ┣ get
 	
 	/// The optional human-readable description associated with this schema, if any.
 	public var description: String? {
@@ -178,6 +230,8 @@ public indirect enum JSONSchema: Sendable {
 			 let .integer(_, _, _, _, _, d, _, _, _): 	return d
 		}
 	}
+	
+	// MARK: ┗ set
 	
 	/// Returns a copy of this schema with its description replaced.
 	/// - Parameter newDescription: The new description to set.
@@ -288,77 +342,34 @@ public indirect enum JSONSchema: Sendable {
 	}
 }
 
-// MARK: — JSONValue and Codable support
+// MARK: ↳⃣ String Format
 
-/// A JSON value used for defaults and examples within schemas.
-public enum JSONValue: Equatable, Hashable, Sendable {
-	/// A string value.
-	case string(String)
-	/// A numeric (floating-point) value.
-	case number(Double)
-	/// An integer value.
-	case integer(Int)
-	/// A boolean value.
-	case boolean(Bool)
-	/// A null value.
-	case null
-	/// An object value with string keys.
-	case object([String: JSONValue])
-	/// An array of JSON values.
-	case array([JSONValue])
-}
-
-extension JSONValue: Codable {
-	/// Decodes a JSONValue from a single-value or nested container.
-	public init(from decoder: any Decoder) throws {
-		let container = try decoder.singleValueContainer()
-		
-		if container.decodeNil() {
-			self = .null
-		} else if let b = try? container.decode(Bool.self) {
-			self = .boolean(b)
-		} else if let i = try? container.decode(Int.self) {
-			self = .integer(i)
-		} else if let d = try? container.decode(Double.self) {
-			self = .number(d)
-		} else if let s = try? container.decode(String.self) {
-			self = .string(s)
-		} else if let arr = try? container.decode([JSONValue].self) {
-			self = .array(arr)
-		} else if let obj = try? container.decode([String: JSONValue].self) {
-			self = .object(obj)
-		} else {
-			let context = DecodingError.Context(
-				codingPath: decoder.codingPath,
-				debugDescription: "Unable to decode JSONValue"
-			)
-			throw DecodingError.dataCorrupted(context)
-		}
-	}
-	
-	/// Encodes this JSONValue into a single-value container.
-	public func encode(to encoder: any Encoder) throws {
-		var container = encoder.singleValueContainer()
-		switch self {
-		case .null:
-			try container.encodeNil()
-		case .boolean(let b):
-			try container.encode(b)
-		case .integer(let i):
-			try container.encode(i)
-		case .number(let d):
-			try container.encode(d)
-		case .string(let s):
-			try container.encode(s)
-		case .array(let arr):
-			try container.encode(arr)
-		case .object(let obj):
-			try container.encode(obj)
-		}
+extension JSONSchema {
+	/// Well-known formats for string schemas, following common JSON Schema conventions.
+	@IsCase
+	public enum StringFormat: String, Codable, Hashable, Sendable, CaseIterable {
+		/// IPv4 address (e.g., 192.168.0.1)
+		case ipv4
+		/// IPv6 address (e.g., ::1)
+		case ipv6
+		/// Universally unique identifier
+		case uuid
+		/// Calendar date in RFC 3339 full-date format
+		case date
+		/// Time of day in RFC 3339 full-time format
+		case time
+		/// Email address
+		case email
+		/// Duration in ISO 8601 format
+		case duration
+		/// DNS hostname
+		case hostname
+		/// Date and time in RFC 3339 date-time format
+		case dateTime = "date-time"
 	}
 }
 
-// MARK: — Equatable & Hashable conformance for JSONSchema
+// MARK: :⃣ Equatable
 
 extension JSONSchema: Equatable {
 	/// Returns true if two schemas are structurally equal,
@@ -426,26 +437,24 @@ extension JSONSchema: Equatable {
 	}
 }
 
+// MARK: :⃣ Hashable
+
 extension JSONSchema: Hashable {
 	/// Hashes the essential components of the schema to support use in hashed collections.
 	public func hash(into hasher: inout Hasher) {
+		hasher.combine(caseName)
 		switch self {
 		case let .null(d):
-			hasher.combine(0)
 			hasher.combine(d)
 		case let .boolean(d):
-			hasher.combine(1)
 			hasher.combine(d)
 		case let .anyOf(c, d):
-			hasher.combine(2)
 			hasher.combine(c)
 			hasher.combine(d)
 		case let .enum(cases, d):
-			hasher.combine(3)
 			hasher.combine(cases)
 			hasher.combine(d)
 		case let .object(p, r, a, d, t, def, ex):
-			hasher.combine(4)
 			hasher.combine(p)
 			hasher.combine(r)
 			hasher.combine(a)
@@ -454,7 +463,6 @@ extension JSONSchema: Hashable {
 			hasher.combine(def)
 			hasher.combine(ex)
 		case let .string(pat, fmt, d, t, def, ex):
-			hasher.combine(5)
 			hasher.combine(pat)
 			hasher.combine(fmt)
 			hasher.combine(d)
@@ -462,7 +470,6 @@ extension JSONSchema: Hashable {
 			hasher.combine(def)
 			hasher.combine(ex)
 		case let .array(of, min, max, d, t, def, ex):
-			hasher.combine(6)
 			hasher.combine(of)
 			hasher.combine(min)
 			hasher.combine(max)
@@ -471,7 +478,6 @@ extension JSONSchema: Hashable {
 			hasher.combine(def)
 			hasher.combine(ex)
 		case let .number(m, min, exMin, max, exMax, d, t, def, ex):
-			hasher.combine(7)
 			hasher.combine(m)
 			hasher.combine(min)
 			hasher.combine(exMin)
@@ -482,7 +488,6 @@ extension JSONSchema: Hashable {
 			hasher.combine(def)
 			hasher.combine(ex)
 		case let .integer(m, min, exMin, max, exMax, d, t, def, ex):
-			hasher.combine(8)
 			hasher.combine(m)
 			hasher.combine(min)
 			hasher.combine(exMin)
@@ -496,14 +501,19 @@ extension JSONSchema: Hashable {
 	}
 }
 
-// MARK: — Codable conformance for JSONSchema
+// MARK: :⃣ Codable
 
 extension JSONSchema: Codable {
-	private enum CodingKeys: String, CodingKey, CaseIterable {
+	
+	// MARK: ↳⃣ Coding Keys
+	
+	fileprivate enum CodingKeys: String, CodingKey, CaseIterable {
 		case type, items, `enum`, anyOf, format, pattern, required, properties,
 			 multipleOf, minimum, maximum, exclusiveMinimum, exclusiveMaximum,
 			 additionalProperties, description, title, `default`, examples
 	}
+	
+	// MARK: ┣ Encode
 	
 	/// Encodes this schema into its JSON Schema representation.
 	public func encode(to encoder: any Encoder) throws {
@@ -630,6 +640,8 @@ extension JSONSchema: Codable {
 		}
 	}
 	
+	// MARK: ┗ Decode
+	
 	/// Initializes a schema from its JSON Schema representation.
 	public init(from decoder: any Decoder) throws {
 		let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -645,11 +657,10 @@ extension JSONSchema: Codable {
 		}
 		
 		let type = try container.decode(String.self, forKey: .type)
+		
 		switch type {
-		case "null":
-			self = .null(description: description)
-		case "boolean":
-			self = .boolean(description: description)
+		case "null": 	self = .null(description: description)
+		case "boolean": self = .boolean(description: description)
 		case "object":
 			let properties = try container.decode([String: JSONSchema].self, forKey: .properties)
 			let required = try container.decodeIfPresent([String].self, forKey: .required)
@@ -736,6 +747,178 @@ extension JSONSchema: Codable {
 				debugDescription: "Unsupported JSONSchema type: \(type)"
 			)
 			throw DecodingError.dataCorrupted(ctx)
+		}
+	}
+}
+
+// MARK: - JSON Value
+
+/// A JSON value used for defaults and examples within schemas.
+public enum JSONValue: Equatable, Hashable, Sendable {
+	/// A string value.
+	case string(String)
+	/// A numeric (floating-point) value.
+	case number(Double)
+	/// An integer value.
+	case integer(Int)
+	/// A boolean value.
+	case boolean(Bool)
+	/// A null value.
+	case null
+	/// An object value with string keys.
+	case object([String: JSONValue])
+	/// An array of JSON values.
+	case array([JSONValue])
+}
+
+// MARK: +⃣ Expressible by …
+
+extension JSONValue: ExpressibleByArrayLiteral,
+					 ExpressibleByFloatLiteral,
+					 ExpressibleByStringLiteral,
+					 ExpressibleByIntegerLiteral,
+					 ExpressibleByBooleanLiteral,
+					 ExpressibleByNilLiteral {
+	
+	/// Creates a ``JSONValue`` from a string literal.
+	/// - Parameter value: The `String` to wrap.
+	@inlinable public init(stringLiteral value: String) {
+		self = .string(value)
+	}
+	
+	/// Creates a ``JSONValue`` from a floating-point literal.
+	/// - Parameter value: The double value to wrap.
+	@inlinable public init(floatLiteral value: Double) {
+		self = .number(value)
+	}
+	
+	/// Creates a ``JSONValue`` from an integer literal.
+	/// - Parameter value: The integer value to wrap.
+	@inlinable public init(integerLiteral value: Int) {
+		self = .integer(value)
+	}
+	
+	/// Creates a ``JSONValue`` from a boolean literal.
+	/// - Parameter value: The boolean value to wrap.
+	@inlinable public init(booleanLiteral value: Bool) {
+		self = .boolean(value)
+	}
+	
+	/// Creates a ``JSONValue`` representing ``JSONValue/null`` from a `nil` literal.
+	@inlinable public init(nilLiteral: ()) {
+		self = .null
+	}
+	
+	/// Creates a ``JSONValue```.```JSONValue/array(_:)``
+	/// from an array literal of ``JSONValue`` elements.
+	///
+	/// - Parameter elements: The ``JSONValue`` elements in the array.
+	@inlinable public init(arrayLiteral elements: JSONValue...) {
+		self = .array(elements)
+	}
+}
+
+// MARK: +⃣ … by Dictionary Literal
+
+extension JSONValue: ExpressibleByDictionaryLiteral {
+	/// Creates a ``JSONValue```.```JSONValue/object(_:)-enum.case``
+	/// from a dictionary literal whose keys are
+	/// `String`-backed `RawRepresentable` & `Hashable` types.
+	///
+	/// - Parameter elements: The key/value pairs to include in the resulting object.
+	/// 						Keys are converted from their raw string values.
+	@inlinable public init(
+		dictionaryLiteral elements: (any Hashable & RawRepresentable<String>, JSONValue)...
+	) {
+		self = Self.object(elements.map {($0.0.rawValue, $0.1)})
+	}
+	
+	/// Builds a ``JSONValue```.```JSONValue/object(_:)-enum.case``
+	/// from a strongly-typed dictionary whose keys are
+	/// `String`-backed `RawRepresentable` & `Hashable`.
+	///
+	/// - Parameter dictionary: A dictionary of typed keys to ``JSONValue``.
+	/// 						  Keys are converted using their raw `String` values.
+	/// - Returns: A ``JSONValue```.```JSONValue/object(_:)-enum.case`` with `String` keys.
+	@inlinable public static func object<K>(
+		_ dictionary: [K: JSONValue]
+	) -> Self where K: RawRepresentable<String>,
+					K: Hashable {
+		.object(dictionary.map {($0.key.rawValue, $0.value)})
+	}
+	
+	/// Builds a ``JSONValue```.```JSONValue/object(_:)-enum.case``
+	/// from key/value tuples where keys are `String`-backed `RawRepresentable`.
+	///
+	/// - Parameter dictionary: An array of `(key, value)` tuples.
+	/// 						   Keys are converted using their `rawString` values.
+	/// - Returns: A ``JSONValue```.```JSONValue/object(_:)-enum.case`` with `String` keys.
+	@inlinable public static func object<K>(
+		_ dictionary: [(K, JSONValue)]
+	) -> Self where K: RawRepresentable<String> {
+		.object(dictionary.map {($0.0.rawValue, $0.1)})
+	}
+	
+	/// Builds a ``JSONValue```.```JSONValue/object(_:)-enum.case``
+	/// from key/value tuples with `String` keys.
+	///
+	/// - Parameter dictionary: An array of `(``String``, ```JSONValue```)` tuples used to
+	/// 					  	  construct the resulting object.
+	/// - Returns: A ``JSONValue```.```JSONValue/object(_:)-enum.case``
+	/// 			with the provided `String` keys.
+	@inlinable public static func object(
+		_ dictionary: [(String, JSONValue)]
+	) -> Self {
+		.object(Dictionary(uniqueKeysWithValues: dictionary))
+	}
+}
+
+// MARK: :⃣ Codable
+
+extension JSONValue: Codable {
+	
+	// MARK: ┣ Decode
+	
+	/// Decodes a JSONValue from a single-value or nested container.
+	public init(from decoder: any Decoder) throws {
+		let container = try decoder.singleValueContainer()
+		
+		if container.decodeNil() {
+			self = .null
+		} else if let b = try? container.decode(Bool.self) {
+			self = .boolean(b)
+		} else if let i = try? container.decode(Int.self) {
+			self = .integer(i)
+		} else if let d = try? container.decode(Double.self) {
+			self = .number(d)
+		} else if let s = try? container.decode(String.self) {
+			self = .string(s)
+		} else if let arr = try? container.decode([JSONValue].self) {
+			self = .array(arr)
+		} else if let obj = try? container.decode([String: JSONValue].self) {
+			self = .object(obj)
+		} else {
+			let context = DecodingError.Context(
+				codingPath: decoder.codingPath,
+				debugDescription: "Unable to decode JSONValue"
+			)
+			throw DecodingError.dataCorrupted(context)
+		}
+	}
+	
+	// MARK: ┗ Encode
+	
+	/// Encodes this JSONValue into a single-value container.
+	public func encode(to encoder: any Encoder) throws {
+		var container = encoder.singleValueContainer()
+		switch self {
+		case .null: 			try container.encodeNil()
+		case .boolean(let b): 	try container.encode(b)
+		case .integer(let i): 	try container.encode(i)
+		case .number(let d): 	try container.encode(d)
+		case .string(let s): 	try container.encode(s)
+		case .array(let arr): 	try container.encode(arr)
+		case .object(let obj): 	try container.encode(obj)
 		}
 	}
 }
