@@ -754,6 +754,7 @@ extension JSONSchema: Codable {
 // MARK: - JSON Value
 
 /// A JSON value used for defaults and examples within schemas.
+@IsCase @CaseName @CaseValue
 public enum JSONValue: Equatable, Hashable, Sendable {
 	/// A string value.
 	case string(String)
@@ -779,97 +780,66 @@ extension JSONValue: ExpressibleByArrayLiteral,
 					 ExpressibleByIntegerLiteral,
 					 ExpressibleByBooleanLiteral,
 					 ExpressibleByNilLiteral {
-	
 	/// Creates a ``JSONValue`` from a string literal.
 	/// - Parameter value: The `String` to wrap.
-	@inlinable public init(stringLiteral value: String) {
-		self = .string(value)
-	}
-	
+	@inlinable public init(stringLiteral value: String) { self = .string(value) }
 	/// Creates a ``JSONValue`` from a floating-point literal.
 	/// - Parameter value: The double value to wrap.
-	@inlinable public init(floatLiteral value: Double) {
-		self = .number(value)
-	}
-	
+	@inlinable public init(floatLiteral value: Double) { self = .number(value) }
 	/// Creates a ``JSONValue`` from an integer literal.
 	/// - Parameter value: The integer value to wrap.
-	@inlinable public init(integerLiteral value: Int) {
-		self = .integer(value)
-	}
-	
+	@inlinable public init(integerLiteral value: Int) { self = .integer(value) }
 	/// Creates a ``JSONValue`` from a boolean literal.
 	/// - Parameter value: The boolean value to wrap.
-	@inlinable public init(booleanLiteral value: Bool) {
-		self = .boolean(value)
-	}
-	
+	@inlinable public init(booleanLiteral value: Bool) { self = .boolean(value) }
 	/// Creates a ``JSONValue`` representing ``JSONValue/null`` from a `nil` literal.
-	@inlinable public init(nilLiteral: ()) {
-		self = .null
-	}
-	
-	/// Creates a ``JSONValue```.```JSONValue/array(_:)``
+	@inlinable public init(nilLiteral: ()) { self = .null }
+	/// Creates a ``JSONValue``.``JSONValue/array(_:)``
 	/// from an array literal of ``JSONValue`` elements.
-	///
 	/// - Parameter elements: The ``JSONValue`` elements in the array.
-	@inlinable public init(arrayLiteral elements: JSONValue...) {
-		self = .array(elements)
-	}
+	@inlinable public init(arrayLiteral elements: JSONValue...) { self = .array(elements)}
 }
 
 // MARK: +⃣ … by Dictionary Literal
 
 extension JSONValue: ExpressibleByDictionaryLiteral {
-	/// Creates a ``JSONValue```.```JSONValue/object(_:)-enum.case``
-	/// from a dictionary literal whose keys are
-	/// `String`-backed `RawRepresentable` & `Hashable` types.
-	///
-	/// - Parameter elements: The key/value pairs to include in the resulting object.
-	/// 						Keys are converted from their raw string values.
-	@inlinable public init(
-		dictionaryLiteral elements: (any Hashable & RawRepresentable<String>, JSONValue)...
-	) {
+	public typealias Stringable = RawRepresentable<String>
+	public typealias Hastringable = Hashable & Stringable
+	
+	/// Creates a ``JSONValue``.``JSONValue/object(_:)-enum.case`` from a dictionary literal
+	/// whose keys are `String`-backed `RawRepresentable` & `Hashable` types.
+	/// - Parameter elements: The key/value pairs to include in the resulting object. Keys
+	/// 	are converted from their raw string values.
+	@inlinable public init(dictionaryLiteral elements: (any Hastringable, JSONValue)...) {
 		self = Self.object(elements.map {($0.0.rawValue, $0.1)})
 	}
 	
-	/// Builds a ``JSONValue```.```JSONValue/object(_:)-enum.case``
-	/// from a strongly-typed dictionary whose keys are
-	/// `String`-backed `RawRepresentable` & `Hashable`.
-	///
-	/// - Parameter dictionary: A dictionary of typed keys to ``JSONValue``.
-	/// 						  Keys are converted using their raw `String` values.
-	/// - Returns: A ``JSONValue```.```JSONValue/object(_:)-enum.case`` with `String` keys.
-	@inlinable public static func object<K>(
-		_ dictionary: [K: JSONValue]
-	) -> Self where K: RawRepresentable<String>,
-					K: Hashable {
-		.object(dictionary.map {($0.key.rawValue, $0.value)})
+	/// Builds a ``JSONValue``.``JSONValue/object(_:)-enum.case`` from a strongly-typed
+	/// dictionary whose keys are `String`-backed `RawRepresentable` & `Hashable`.
+	/// - Parameter dict: A dictionary of typed keys to ``JSONValue``.
+	/// 	Keys are converted using their raw `String` values.
+	/// - Returns: A ``JSONValue``.``JSONValue/object(_:)-enum.case`` with `String` keys.
+	@inlinable public static func object<K: Hastringable>(_ dict: [K: JSONValue]) -> Self {
+		.object(dict.map {($0.key.rawValue, $0.value)})
 	}
 	
-	/// Builds a ``JSONValue```.```JSONValue/object(_:)-enum.case``
-	/// from key/value tuples where keys are `String`-backed `RawRepresentable`.
-	///
-	/// - Parameter dictionary: An array of `(key, value)` tuples.
-	/// 						   Keys are converted using their `rawString` values.
+	/// Builds a ``JSONValue``.``JSONValue/object(_:)-enum.case`` from key/value tuples where
+	/// keys are `String`-backed `RawRepresentable`.
+	/// - Parameter tuples: An array of `(key, value)` tuples. Keys are converted using
+	/// 	their `rawString` values.
 	/// - Returns: A ``JSONValue```.```JSONValue/object(_:)-enum.case`` with `String` keys.
-	@inlinable public static func object<K>(
-		_ dictionary: [(K, JSONValue)]
-	) -> Self where K: RawRepresentable<String> {
-		.object(dictionary.map {($0.0.rawValue, $0.1)})
+	@inlinable public static func object(_ tuples: [(some Stringable, JSONValue)]) -> Self {
+		.object(tuples.map {($0.0.rawValue, $0.1)})
 	}
 	
-	/// Builds a ``JSONValue```.```JSONValue/object(_:)-enum.case``
+	/// Builds a ``JSONValue``.``JSONValue/object(_:)-enum.case``
 	/// from key/value tuples with `String` keys.
-	///
-	/// - Parameter dictionary: An array of `(``String``, ```JSONValue```)` tuples used to
-	/// 					  	  construct the resulting object.
-	/// - Returns: A ``JSONValue```.```JSONValue/object(_:)-enum.case``
-	/// 			with the provided `String` keys.
-	@inlinable public static func object(
-		_ dictionary: [(String, JSONValue)]
-	) -> Self {
-		.object(Dictionary(uniqueKeysWithValues: dictionary))
+	/// - Parameter tuples: An array of (`String`, ``JSONValue``) tuples used to construct
+	/// 	the resulting object.
+	/// - Returns: A ``JSONValue``.``JSONValue/object(_:)-enum.case`` with the provided
+	/// 	`String` keys.
+	@inlinable public static func object(_ tuples: [(String, JSONValue)]) -> Self {
+		.object(Dictionary(uniqueKeysWithValues: tuples))
 	}
 }
 
@@ -879,7 +849,7 @@ extension JSONValue: Codable {
 	
 	// MARK: ┣ Decode
 	
-	/// Decodes a JSONValue from a single-value or nested container.
+	/// Decodes a ``JSONValue`` from a single-value or nested container.
 	public init(from decoder: any Decoder) throws {
 		let container = try decoder.singleValueContainer()
 		
@@ -908,7 +878,7 @@ extension JSONValue: Codable {
 	
 	// MARK: ┗ Encode
 	
-	/// Encodes this JSONValue into a single-value container.
+	/// Encodes this ``JSONValue`` into a single-value container.
 	public func encode(to encoder: any Encoder) throws {
 		var container = encoder.singleValueContainer()
 		switch self {
