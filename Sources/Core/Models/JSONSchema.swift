@@ -782,22 +782,22 @@ extension JSONValue: ExpressibleByArrayLiteral,
 					 ExpressibleByNilLiteral {
 	/// Creates a ``JSONValue`` from a string literal.
 	/// - Parameter value: The `String` to wrap.
-	@inlinable public init(stringLiteral value: String) { self = .string(value) }
+	public init(stringLiteral value: String) { self = .string(value) }
 	/// Creates a ``JSONValue`` from a floating-point literal.
 	/// - Parameter value: The double value to wrap.
-	@inlinable public init(floatLiteral value: Double) { self = .number(value) }
+	public init(floatLiteral value: Double) { self = .number(value) }
 	/// Creates a ``JSONValue`` from an integer literal.
 	/// - Parameter value: The integer value to wrap.
-	@inlinable public init(integerLiteral value: Int) { self = .integer(value) }
+	public init(integerLiteral value: Int) { self = .integer(value) }
 	/// Creates a ``JSONValue`` from a boolean literal.
 	/// - Parameter value: The boolean value to wrap.
-	@inlinable public init(booleanLiteral value: Bool) { self = .boolean(value) }
+	public init(booleanLiteral value: Bool) { self = .boolean(value) }
 	/// Creates a ``JSONValue`` representing ``JSONValue/null`` from a `nil` literal.
-	@inlinable public init(nilLiteral: ()) { self = .null }
+	public init(nilLiteral: ()) { self = .null }
 	/// Creates a ``JSONValue``.``JSONValue/array(_:)``
 	/// from an array literal of ``JSONValue`` elements.
 	/// - Parameter elements: The ``JSONValue`` elements in the array.
-	@inlinable public init(arrayLiteral elements: JSONValue...) { self = .array(elements)}
+	public init(arrayLiteral elements: JSONValue...) { self = .array(elements)}
 }
 
 // MARK: +⃣ … by Dictionary Literal
@@ -810,7 +810,10 @@ extension JSONValue: ExpressibleByDictionaryLiteral {
 	/// whose keys are `String`-backed `RawRepresentable` & `Hashable` types.
 	/// - Parameter elements: The key/value pairs to include in the resulting object. Keys
 	/// 	are converted from their raw string values.
-	@inlinable public init(dictionaryLiteral elements: (any Hastringable, JSONValue)...) {
+	public init(dictionaryLiteral elements: (any Hastringable, JSONValue)...) {
+		// let pairs: [(String, JSONValue)] = elements.map { (key, value) in (key.rawValue, value) }
+		// let dict = Dictionary(uniqueKeysWithValues: pairs)
+		// self = Self.object(dict)
 		self = Self.object(elements.map {($0.0.rawValue, $0.1)})
 	}
 	
@@ -819,7 +822,7 @@ extension JSONValue: ExpressibleByDictionaryLiteral {
 	/// - Parameter dict: A dictionary of typed keys to ``JSONValue``.
 	/// 	Keys are converted using their raw `String` values.
 	/// - Returns: A ``JSONValue``.``JSONValue/object(_:)-enum.case`` with `String` keys.
-	@inlinable public static func object<K: Hastringable>(_ dict: [K: JSONValue]) -> Self {
+	public static func object<K: Hastringable>(_ dict: [K: JSONValue]) -> Self {
 		.object(dict.map {($0.key.rawValue, $0.value)})
 	}
 	
@@ -828,7 +831,7 @@ extension JSONValue: ExpressibleByDictionaryLiteral {
 	/// - Parameter tuples: An array of `(key, value)` tuples. Keys are converted using
 	/// 	their `rawString` values.
 	/// - Returns: A ``JSONValue```.```JSONValue/object(_:)-enum.case`` with `String` keys.
-	@inlinable public static func object(_ tuples: [(some Stringable, JSONValue)]) -> Self {
+	public static func object(_ tuples: [(some Stringable, JSONValue)]) -> Self {
 		.object(tuples.map {($0.0.rawValue, $0.1)})
 	}
 	
@@ -838,7 +841,7 @@ extension JSONValue: ExpressibleByDictionaryLiteral {
 	/// 	the resulting object.
 	/// - Returns: A ``JSONValue``.``JSONValue/object(_:)-enum.case`` with the provided
 	/// 	`String` keys.
-	@inlinable public static func object(_ tuples: [(String, JSONValue)]) -> Self {
+	public static func object(_ tuples: [(String, JSONValue)]) -> Self {
 		.object(Dictionary(uniqueKeysWithValues: tuples))
 	}
 }
