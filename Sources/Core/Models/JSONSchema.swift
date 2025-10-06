@@ -811,10 +811,10 @@ extension JSONValue: ExpressibleByDictionaryLiteral {
 	/// - Parameter elements: The key/value pairs to include in the resulting object. Keys
 	/// 	are converted from their raw string values.
 	public init(dictionaryLiteral elements: (any Hastringable, JSONValue)...) {
-		// let pairs: [(String, JSONValue)] = elements.map { (key, value) in (key.rawValue, value) }
-		// let dict = Dictionary(uniqueKeysWithValues: pairs)
-		// self = Self.object(dict)
-		self = Self.object(elements.map {($0.0.rawValue, $0.1)})
+		let pairs: [(String, JSONValue)] = elements.map { (key, value) in (key.rawValue, value) }
+		let dict = Dictionary(uniqueKeysWithValues: pairs)
+		self = Self.object(dict)
+		// self = Self.object(elements.map {($0.0.rawValue, $0.1)})
 	}
 	
 	/// Builds a ``JSONValue``.``JSONValue/object(_:)-enum.case`` from a strongly-typed
