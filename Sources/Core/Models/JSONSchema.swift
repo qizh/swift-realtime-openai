@@ -810,8 +810,10 @@ extension JSONValue: ExpressibleByDictionaryLiteral {
 	/// whose keys are `String`-backed `RawRepresentable` & `Hashable` types.
 	/// - Parameter elements: The key/value pairs to include in the resulting object. Keys
 	/// 	are converted from their raw string values.
-	public init(dictionaryLiteral elements: (any Hastringable, JSONValue)...) {
-		let pairs: [(String, JSONValue)] = elements.map { (key, value) in (key.rawValue, value) }
+	public init(dictionaryLiteral elements: (any Stringable, JSONValue)...) {
+		let pairs: [(String, JSONValue)] = elements.map { element in
+			(element.0.rawValue, element.1)
+		}
 		let dict = Dictionary(uniqueKeysWithValues: pairs)
 		self = Self.object(dict)
 		// self = Self.object(elements.map {($0.0.rawValue, $0.1)})
@@ -822,17 +824,23 @@ extension JSONValue: ExpressibleByDictionaryLiteral {
 	/// - Parameter dict: A dictionary of typed keys to ``JSONValue``.
 	/// 	Keys are converted using their raw `String` values.
 	/// - Returns: A ``JSONValue``.``JSONValue/object(_:)-enum.case`` with `String` keys.
-	public static func object<K: Hastringable>(_ dict: [K: JSONValue]) -> Self {
-		.object(dict.map {($0.key.rawValue, $0.value)})
+	public static func object<K: Hastringable>(_ dict: [K: JSONValue]) -> JSONValue {
+		let pairs: [(String, JSONValue)] = dict.map { (key, value) in (key.rawValue, value) }
+		let dict = Dictionary(uniqueKeysWithValues: pairs)
+		return .object(dict)
+		// .object(dict.map {($0.key.rawValue, $0.value)})
 	}
 	
 	/// Builds a ``JSONValue``.``JSONValue/object(_:)-enum.case`` from key/value tuples where
 	/// keys are `String`-backed `RawRepresentable`.
 	/// - Parameter tuples: An array of `(key, value)` tuples. Keys are converted using
 	/// 	their `rawString` values.
-	/// - Returns: A ``JSONValue```.```JSONValue/object(_:)-enum.case`` with `String` keys.
-	public static func object(_ tuples: [(some Stringable, JSONValue)]) -> Self {
-		.object(tuples.map {($0.0.rawValue, $0.1)})
+	/// - Returns: A ``JSONValue``.``JSONValue/object(_:)-enum.case`` with `String` keys.
+	public static func object(_ tuples: [(some Stringable, JSONValue)]) -> JSONValue {
+		let pairs: [(String, JSONValue)] = tuples.map { (key, value) in (key.rawValue, value) }
+		let dict = Dictionary(uniqueKeysWithValues: pairs)
+		return .object(dict)
+		// .object(tuples.map {($0.0.rawValue, $0.1)})
 	}
 	
 	/// Builds a ``JSONValue``.``JSONValue/object(_:)-enum.case``
@@ -841,8 +849,10 @@ extension JSONValue: ExpressibleByDictionaryLiteral {
 	/// 	the resulting object.
 	/// - Returns: A ``JSONValue``.``JSONValue/object(_:)-enum.case`` with the provided
 	/// 	`String` keys.
-	public static func object(_ tuples: [(String, JSONValue)]) -> Self {
-		.object(Dictionary(uniqueKeysWithValues: tuples))
+	public static func object(_ tuples: [(String, JSONValue)]) -> JSONValue {
+		let dict = Dictionary(uniqueKeysWithValues: tuples)
+		return .object(dict)
+		// .object(Dictionary(uniqueKeysWithValues: tuples))
 	}
 }
 
