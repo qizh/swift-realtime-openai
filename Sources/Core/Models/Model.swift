@@ -2,11 +2,13 @@ import QizhMacroKit
 
 public enum Model: RawRepresentable, Equatable, Hashable, Codable, Sendable {
 	case gptRealtime
+	case gptRealtimeMini
 	case custom(String)
 
 	public var rawValue: String {
 		switch self {
 			case .gptRealtime: return "gpt-realtime"
+			case .gptRealtimeMini: return "gpt-realtime-mini"
 			case let .custom(value): return value
 		}
 	}
@@ -14,6 +16,7 @@ public enum Model: RawRepresentable, Equatable, Hashable, Codable, Sendable {
 	public init?(rawValue: String) {
 		switch rawValue {
 			case "gpt-realtime": self = .gptRealtime
+			case "gpt-realtime-mini": self = .gptRealtimeMini
 			default: self = .custom(rawValue)
 		}
 	}
