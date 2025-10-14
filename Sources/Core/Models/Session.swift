@@ -67,7 +67,9 @@ import QizhMacroKit
 
 	/// The format of input audio.
 	public struct AudioFormat: Equatable, Hashable, Codable, Sendable {
+		/// Sample rate in Hz (e.g., 24000 for 24 kHz)
 		public var rate: Int
+		/// MIME type describing the audio encoding
 		public var type: String
 		
 		public init(rate: Int, type: String) {

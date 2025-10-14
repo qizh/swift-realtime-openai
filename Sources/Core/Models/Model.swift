@@ -7,9 +7,9 @@ public enum Model: RawRepresentable, Equatable, Hashable, Codable, Sendable {
 
 	public var rawValue: String {
 		switch self {
-			case .gptRealtime: return "gpt-realtime"
-			case .gptRealtimeMini: return "gpt-realtime-mini"
-			case let .custom(value): return value
+			case .gptRealtime: "gpt-realtime"
+			case .gptRealtimeMini: "gpt-realtime-mini"
+			case let .custom(value): value
 		}
 	}
 
