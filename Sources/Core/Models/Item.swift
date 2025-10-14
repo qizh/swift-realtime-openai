@@ -152,7 +152,7 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 
 		/// The label of the MCP server running the tool.
 		@CodedAt("server_label")
-		public var server: String
+		public var server: String?
 
 		/// The name of the tool that was run.
 		@CodedAt("name")
@@ -179,7 +179,15 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 		/// - Parameter output: The output from the tool call.
 		/// - Parameter error: The error from the tool call, if any.
 		/// - Parameter approvalRequestId: The ID of an associated approval request, if any.
-		public init(id: String, server: String, tool: String, arguments: String, output: String? = nil, error: Error? = nil, approvalRequestId: String? = nil) {
+		public init(
+			id: String,
+			server: String? = nil,
+			tool: String,
+			arguments: String,
+			output: String? = nil,
+			error: Error? = nil,
+			approvalRequestId: String? = nil
+		) {
 			self.id = id
 			self.tool = tool
 			self.error = error
@@ -197,7 +205,7 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 
 		/// The label of the MCP server making the request.
 		@CodedAt("server_label")
-		public var server: String
+		public var server: String?
 
 		/// The name of the tool to run.
 		@CodedAt("name")
@@ -212,7 +220,7 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 		/// - Parameter server: The label of the MCP server making the request.
 		/// - Parameter tool: The name of the tool to run.
 		/// - Parameter arguments: A JSON string of arguments for the tool.
-		public init(id: String, server: String, tool: String, arguments: String) {
+		public init(id: String, server: String? = nil, tool: String, arguments: String) {
 			self.id = id
 			self.tool = tool
 			self.server = server
@@ -318,10 +326,10 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 
 		/// The label of the MCP server.
 		@CodedAt("server_label")
-		public var server: String
+		public var server: String?
 
 		/// The tools available on the server.
-		public var tools: [Tool]
+		public var tools: [Tool]?
 	}
 
 	/// A message item in a Realtime conversation.
