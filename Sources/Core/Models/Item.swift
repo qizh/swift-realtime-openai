@@ -267,7 +267,8 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 				/// If false, the tool performs only additive updates.
 				public var destructiveHint: Bool?
 
-				/// If true, calling the tool repeatedly with the same arguments will have no additional effect on its environment.
+				/// If true, calling the tool repeatedly with the same arguments will have
+				/// no additional effect on its environment.
 				public var idempotentHint: Bool?
 
 				/// If true, this tool may interact with an "open world" of external
@@ -330,6 +331,16 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 
 		/// The tools available on the server.
 		public var tools: [Tool]?
+		
+		package init(
+			id: String,
+			server: String? = nil,
+			tools: [Tool]? = nil
+		) {
+			self.id = id
+			self.server = server
+			self.tools = tools
+		}
 	}
 
 	/// A message item in a Realtime conversation.
