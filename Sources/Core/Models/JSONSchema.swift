@@ -510,7 +510,8 @@ extension JSONSchema: Codable {
 	fileprivate enum CodingKeys: String, CodingKey, CaseIterable {
 		case type, items, `enum`, anyOf, format, pattern, required, properties,
 			 multipleOf, minimum, maximum, exclusiveMinimum, exclusiveMaximum,
-			 additionalProperties, description, title, `default`, examples
+			 additionalProperties, description, title, `default`, examples,
+			 minItems, maxItems
 	}
 	
 	// MARK: ┣ Encode
@@ -587,8 +588,8 @@ extension JSONSchema: Codable {
 		):
 			try container.encode("array", forKey: .type)
 			try container.encode(of, forKey: .items)
-			if let mi = minItems { try container.encode(mi, forKey: .minimum) }
-			if let ma = maxItems { try container.encode(ma, forKey: .maximum) }
+			if let mi = minItems { try container.encode(mi, forKey: .minItems) }
+			if let ma = maxItems { try container.encode(ma, forKey: .maxItems) }
 			if let d = description { try container.encode(d, forKey: .description) }
 			if let t = title { try container.encode(t, forKey: .title) }
 			if let dv = defaultValue { try container.encode(dv, forKey: .default) }
@@ -662,7 +663,7 @@ extension JSONSchema: Codable {
 		case "null": 	self = .null(description: description)
 		case "boolean": self = .boolean(description: description)
 		case "object":
-			let properties = try container.decode([String: JSONSchema].self, forKey: .properties)
+			let properties = (try? container.decode([String: JSONSchema].self, forKey: .properties)) ?? [:]
 			let required = try container.decodeIfPresent([String].self, forKey: .required)
 			let additionalProperties = try container.decodeIfPresent(JSONSchema.self, forKey: .additionalProperties)
 			self = .object(
@@ -690,8 +691,10 @@ extension JSONSchema: Codable {
 			)
 		case "array":
 			let items = try container.decode(JSONSchema.self, forKey: .items)
-			let minItems = try container.decodeIfPresent(Int.self, forKey: .minimum)
-			let maxItems = try container.decodeIfPresent(Int.self, forKey: .maximum)
+			let minItems = try container.decodeIfPresent(Int.self, forKey: .minItems)
+							?? container.decodeIfPresent(Int.self, forKey: .minimum)
+			let maxItems = try container.decodeIfPresent(Int.self, forKey: .maxItems)
+							?? container.decodeIfPresent(Int.self, forKey: .maximum)
 			let dv = defaultValue.map { [$0] }
 			let exNested = examples?.compactMap { [JSONValue.array([$0])] }
 			self = .array(
