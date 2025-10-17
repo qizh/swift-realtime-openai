@@ -148,7 +148,59 @@ public enum Tool: Equatable, Hashable, Sendable {
 			self.authorization = authorization
 			self.requireApproval = requireApproval
 		}
-
+		
+		/// Creates an MCP configuration that connects to a remote MCP server by URL.
+		/// 
+		/// Use this initializer when you have a direct MCP server endpoint and want to
+		/// optionally scope which tools can be invoked and how tool approvals are handled.
+		/// The resulting configuration is identified by a human‑readable label that is
+		/// used in tool call routing.
+		///
+		/// - Important: This initializer configures a remote MCP server via its URL
+		/// 	(not a service connector). If you need to use a service connector, use the
+		/// 	corresponding connector-based initializer instead.
+		///
+		/// - Parameters:
+		///   - label: A human‑readable label for this MCP server,
+		///   	used to identify it in tool calls (encoded as `server_label`).
+		///   - url: The URL of the remote MCP server (encoded as `server_url`).
+		///   	Must be reachable by your application.
+		///   - authorization: An optional OAuth access token to authenticate with the
+		///   	remote MCP server (encoded as `authorization`). Your application is
+		///   	responsible for performing the OAuth flow and providing a valid token.
+		///   - allowedTools: An optional whitelist of tool names that this server
+		///   	is allowed to expose (encoded in camelCase as `allowedTools`).
+		///   - headers: Optional HTTP headers to include with requests to the MCP server.
+		///   	Useful for additional authentication or custom metadata.
+		///   - requireApproval: Optional approval policy indicating which tools require
+		///   	user approval before execution. Use ``Tool/MCP/RequireApproval/all(_:)``
+		///   	to set a uniform policy or ``Tool/MCP/RequireApproval/granular(always:never:)``
+		///   	to specify per‑tool requirements.
+		///
+		/// - Note: Although some server events may include a `server_description`,
+		/// 	that field is not supported by the Realtime API schema for client events
+		/// 	and will be ignored if provided.
+		///
+		/// - SeeAlso: ``Tool/MCP/RequireApproval`` for approval policy options
+		/// 	and encoding behavior.
+		public init(
+			label: String,
+			url: URL,
+			authorization: String? = nil,
+			allowedTools: [some RawRepresentable<String>]? = nil,
+			headers: [String: String]? = nil,
+			requireApproval: RequireApproval? = nil
+		) {
+			self.init(
+				label: label,
+				url: url,
+				authorization: authorization,
+				allowedTools: allowedTools?.map(\.rawValue),
+				headers: headers,
+				requireApproval: requireApproval
+			)
+		}
+		
 		/// Create a new `MCP` instance for a service connector.
 		///
 		/// - Parameter label: A label for this MCP server, used to identify it in tool calls.
