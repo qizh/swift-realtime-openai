@@ -76,7 +76,7 @@ public enum Tool: Equatable, Hashable, Sendable {
 			/// - Parameter never: Tools that never require approval.
 			case granular(always: [String]? = nil, never: [String]? = nil)
 		}
-
+		
 		/// A label for this MCP server, used to identify it in tool calls.
 		/// It is optional because not every server event has this value.
 		@CodedAt("server_label") public var label: String?
@@ -95,10 +95,17 @@ public enum Tool: Equatable, Hashable, Sendable {
 		/// Your application must handle the OAuth authorization flow
 		/// and provide the token here.
 		public var authorization: String?
-
+		
 		/// List of allowed tool names.
+		///
+		/// - Attention: Rare case where Client Event parameter name
+		/// 	should be `camelCase` encoded.
+		/// 	It's going to be ignored if encoded as `snake_case`.
+		/// 	- `"allowedTools"` works
+		/// 	- `"allowed_tools` doesn't
+		/// 	On the other hand, it will be sent back in `camelCase` in server event.
 		public var allowedTools: [String]?
-
+		
 		/// Optional HTTP headers to send to the MCP server.
 		///
 		/// Use for authentication or other purposes.
