@@ -214,6 +214,149 @@ public indirect enum JSONSchema: Sendable {
 
 extension JSONSchema {
 	
+	// MARK: ┣ Human Readable
+	
+	public var humanReadableString: String {
+        /// Local helper to render JSONValue for defaults/examples
+		/// without relying on external extensions
+        func render(_ value: JSONValue) -> String {
+            switch value {
+            case .null:
+                return "null"
+            case let .boolean(b):
+                return b ? "true" : "false"
+            case let .integer(i):
+                return i.formatted(.number)
+            case let .number(d):
+                return d.formatted(.number)
+            case let .string(s):
+                return "\"\(s)\""
+            case let .array(arr):
+                let inner = arr.map { render($0) }.joined(separator: ", ")
+                return "[\(inner)]"
+            case let .object(obj):
+                let inner = obj
+                    .map { key, value in "\(key): \(render(value))" }
+                    .sorted()
+                    .joined(separator: ", ")
+                return "{\(inner)}"
+            }
+        }
+        
+        func renderParts(_ parts: [String: String?]) -> String {
+            parts
+                .compactMap { key, value in
+                    guard let v = value else { return nil }
+                    return "\(key): \(v)"
+                }
+                .sorted()
+                .joined(separator: ", ")
+        }
+
+        switch self {
+        case .null:
+            return "null"
+        case let .boolean(d):
+            return "boolean(\(d ?? "null"))"
+        case let .integer(multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, description, title, defaultValue, examples):
+            let rendered = renderParts([
+                "multipleOf": multipleOf?.formatted(.number),
+                "minimum": minimum?.formatted(.number),
+                "exclusiveMinimum": exclusiveMinimum?.formatted(.number),
+                "maximum": maximum?.formatted(.number),
+                "exclusiveMaximum": exclusiveMaximum?.formatted(.number),
+                "description": description,
+                "title": title,
+                "defaultValue": defaultValue?.formatted(.number),
+                "examples": examples?.map { $0.formatted(.number) }.joined(separator: ", "),
+            ])
+            return rendered.isEmpty ? "integer" : "{\(rendered)}"
+        case let .number(multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, description, title, defaultValue, examples):
+            let rendered = renderParts([
+                "multipleOf": multipleOf?.formatted(.number),
+                "minimum": minimum?.formatted(.number),
+                "exclusiveMinimum": exclusiveMinimum?.formatted(.number),
+                "maximum": maximum?.formatted(.number),
+                "exclusiveMaximum": exclusiveMaximum?.formatted(.number),
+                "description": description,
+                "title": title,
+                "defaultValue": defaultValue?.formatted(.number),
+                "examples": examples?.map { $0.formatted(.number) }.joined(separator: ", "),
+            ])
+            return rendered.isEmpty ? "number" : "{\(rendered)}"
+        case let .string(pattern, format, description, title, defaultValue, examples):
+            let rendered = renderParts([
+                "pattern": pattern,
+                "format": format?.rawValue,
+                "description": description,
+                "title": title,
+                "defaultValue": defaultValue,
+                "examples": examples?.joined(separator: ", "),
+            ])
+            return rendered.isEmpty ? "string" : "{\(rendered)}"
+        case let .array(of, minItems, maxItems, description, title, defaultValue, examples):
+            let defaultRendered: String? = defaultValue.map { values in
+                let inner = values.map { render($0) }.joined(separator: ", ")
+                return "[\(inner)]"
+            }
+            let examplesRendered: String? = examples.map { arrays in
+                arrays.map { arr in
+                    let inner = arr.map { render($0) }.joined(separator: ", ")
+                    return "[\(inner)]"
+                }.joined(separator: ", ")
+            }
+            let rendered = renderParts([
+                "minItems": minItems?.formatted(.number),
+                "maxItems": maxItems?.formatted(.number),
+                "description": description,
+                "title": title,
+                "defaultValue": defaultRendered,
+                "examples": examplesRendered,
+            ])
+            let head = "[\(of.humanReadableString)]"
+            return rendered.isEmpty ? head : "\(head) {\(rendered)}"
+        case let .object(properties, required, additionalProperties, description, title, defaultValue, examples):
+            let propsRendered: String = {
+                let pairs = properties
+                    .map { key, value in "\(key): \(value.humanReadableString)" }
+                    .sorted()
+                    .joined(separator: ", ")
+                return "{\(pairs)}"
+            }()
+            let defaultRendered: String? = defaultValue.map { render($0) }
+            let examplesRendered: String? = examples?.map { render($0) }.joined(separator: ", ")
+            let reqRendered: String? = required?.sorted().joined(separator: ", ")
+            let addPropsRendered: String? = additionalProperties?.humanReadableString
+            let rendered = renderParts([
+                "properties": propsRendered,
+                "required": reqRendered,
+                "additionalProperties": addPropsRendered,
+                "description": description,
+                "title": title,
+                "defaultValue": defaultRendered,
+                "examples": examplesRendered,
+            ])
+            return "{\(rendered)}"
+        case let .anyOf(schemas, d):
+			let parts = schemas
+                .map(\.humanReadableString)
+                .joined(separator: " || ")
+            if let d {
+                return "( \(parts) )\n\(d)"
+            } else {
+                return "( \(parts) )"
+            }
+        case let .enum(cases, d):
+            let parts = cases
+                .joined(separator: " | ")
+            if let d {
+                return "( \(parts) )\n\(d)"
+            } else {
+                return "( \(parts) )"
+            }
+        }
+    }
+	
 	// MARK: ┣ get
 	
 	/// The optional human-readable description associated with this schema, if any.
@@ -341,7 +484,6 @@ extension JSONSchema {
 		}
 	}
 }
-
 // MARK: ↳⃣ String Format
 
 extension JSONSchema {
@@ -856,6 +998,49 @@ extension JSONValue: ExpressibleByDictionaryLiteral {
 		let dict = Dictionary(uniqueKeysWithValues: tuples)
 		return .object(dict)
 		// .object(Dictionary(uniqueKeysWithValues: tuples))
+	}
+}
+
+// MARK: :⃣ Description
+
+extension JSONValue: CustomStringConvertible {
+	public var description: String {
+		func escape(_ s: String) -> String {
+			var out = ""
+			out.reserveCapacity(s.count)
+			for ch in s {
+				switch ch {
+				case "\\": out.append("\\\\")
+				case "\"": out.append("\\\"")
+				case "\n": out.append("\\n")
+				case "\r": out.append("\\r")
+				case "\t": out.append("\\t")
+				default: out.append(ch)
+				}
+			}
+			return out
+		}
+		switch self {
+		case .null:
+			return "null"
+		case let .boolean(b):
+			return b ? "true" : "false"
+		case let .integer(i):
+			return i.formatted(.number)
+		case let .number(d):
+			return d.formatted(.number)
+		case let .string(s):
+			return "\"\(escape(s))\""
+		case let .array(arr):
+			let inner = arr.map { $0.description }.joined(separator: ", ")
+			return "[\(inner)]"
+		case let .object(obj):
+			let inner = obj
+				.map { key, value in "\"\(escape(key))\": \(value.description)" }
+				.sorted()
+				.joined(separator: ", ")
+			return "{\(inner)}"
+		}
 	}
 }
 
