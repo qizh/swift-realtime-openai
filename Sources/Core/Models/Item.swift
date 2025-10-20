@@ -130,7 +130,62 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 			self.output = output
 		}
 	}
+	
+	/// A Realtime item representing a Model Context Protocol call
+	/// (event type `mcp_call`).
+	@Codable public struct MCPCall: Identifiable, Equatable, Hashable, Sendable {
+		/// The unique ID of the MCP call item.
+		public var id: String
 
+		/// The label of the MCP server handling the call, if available.
+		@CodedAt("server_label")
+		public var server: String?
+
+		/// The name of the MCP tool/function being invoked.
+		public var name: String
+
+		/// The arguments for the call. Can be any JSON value.
+		public var arguments: JSONValue?
+
+		/// The output of the call, if produced. Can be any JSON value.
+		public var output: JSONValue?
+
+		/// The error returned by the call, if any.
+		/// Shape is not guaranteed, so keep it flexible.
+		public var error: JSONValue?
+
+		/// The ID of an associated approval request, if any.
+		@CodedAt("approval_request_id")
+		public var approvalRequestId: String?
+
+		/// Creates a new `MCPCall` instance.
+		/// - Parameters:
+		///   - id: The unique ID of the MCP call item.
+		///   - server: The label of the MCP server handling the call, if available.
+		///   - name: The name of the MCP tool/function being invoked.
+		///   - arguments: The arguments for the call. Can be any JSON value.
+		///   - output: The output of the call, if produced. Can be any JSON value.
+		///   - error: The error returned by the call, if any.
+		///   - approvalRequestId: The ID of an associated approval request, if any.
+		public init(
+			id: String,
+			server: String? = nil,
+			name: String,
+			arguments: JSONValue? = nil,
+			output: JSONValue? = nil,
+			error: JSONValue? = nil,
+			approvalRequestId: String? = nil
+		) {
+			self.id = id
+			self.server = server
+			self.name = name
+			self.arguments = arguments
+			self.output = output
+			self.error = error
+			self.approvalRequestId = approvalRequestId
+		}
+	}
+	
 	/// A Realtime item representing an invocation of a tool on an MCP server.
 	@Codable public struct MCPToolCall: Identifiable, Equatable, Hashable, Sendable {
 		/// An error that occurred during the MCP call.
@@ -283,11 +338,21 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 				/// Creates a new set of annotations for a tool.
 				///
 				/// - Parameter title: A human-readable title for the tool.
-				/// - Parameter destructiveHint: If true, the tool may perform destructive updates to its environment.
-				/// - Parameter idempotentHint: If true, calling the tool repeatedly with the same arguments will have no additional effect on its environment.
-				/// - Parameter openWorldHint: If true, this tool may interact with an "open world" of external entities.
-				/// - Parameter readOnlyHint: If true, the tool does not modify its environment.
-				public init(title: String? = nil, destructiveHint: Bool? = nil, idempotentHint: Bool? = nil, openWorldHint: Bool? = nil, readOnlyHint: Bool? = nil) {
+				/// - Parameter destructiveHint: If true, the tool may perform destructive
+				/// 	updates to its environment.
+				/// - Parameter idempotentHint: If true, calling the tool repeatedly with the
+				/// 	same arguments will have no additional effect on its environment.
+				/// - Parameter openWorldHint: If true, this tool may interact with an
+				/// 	"open world" of external entities.
+				/// - Parameter readOnlyHint: If true, the tool does not modify its
+				/// 	environment.
+				public init(
+					title: String? = nil,
+					destructiveHint: Bool? = nil,
+					idempotentHint: Bool? = nil,
+					openWorldHint: Bool? = nil,
+					readOnlyHint: Bool? = nil
+				) {
 					self.title = title
 					self.readOnlyHint = readOnlyHint
 					self.openWorldHint = openWorldHint
@@ -354,6 +419,9 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 	@CodedAs("function_call_output")
 	case functionCallOutput(FunctionCallOutput)
 
+	@CodedAs("mcp_call")
+	case mcpCall(MCPCall)
+	
 	/// A Realtime item representing an invocation of a tool on an MCP server.
 	@CodedAs("mcp_tool_call")
 	case mcpToolCall(MCPToolCall)
@@ -379,6 +447,7 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 			case let .functionCallOutput(functionCallOutput): functionCallOutput.id
 			case let .mcpApprovalRequest(mcpApprovalRequest): mcpApprovalRequest.id
 			case let .mcpApprovalResponse(mcpApprovalResponse): mcpApprovalResponse.id
+			case let .mcpCall(mcpCall): mcpCall.id
 		}
 	}
 }
