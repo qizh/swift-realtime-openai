@@ -1,4 +1,5 @@
 import QizhMacroKit
+import Foundation
 
 // MARK: JSON Schema
 
@@ -1094,3 +1095,176 @@ extension JSONValue: Codable {
 	}
 }
 
+// MARK: - Validator (lightweight)
+
+public enum JSONSchemaValidationError: LocalizedError, CustomStringConvertible, Sendable {
+	case typeMismatch(expected: String, actual: String, path: String)
+	case missingRequiredProperty(name: String, path: String)
+	case missingRequiredArguments(required: [String])
+	case unknownProperty(name: String, path: String)
+	case anyOfNoMatch(path: String)
+	case stringEnumMismatch(allowed: [String], actual: String, path: String)
+	case arrayTooShort(min: Int, actual: Int, path: String)
+	case arrayTooLong(max: Int, actual: Int, path: String)
+
+	public var errorDescription: String? { description }
+	public var description: String {
+		switch self {
+		case let .typeMismatch(expected, actual, path):
+			"Type mismatch at \(path): expected \(expected), got \(actual)"
+		case let .missingRequiredProperty(name, path):
+			"Missing required property ‘\(name)’ at \(path)"
+		case let .missingRequiredArguments(required):
+			"Missing required arguments: \(required.joined(separator: ", "))"
+		case let .unknownProperty(name, path):
+			"Unknown property ‘\(name)’ at \(path)"
+		case let .anyOfNoMatch(path):
+			"No variant matched for anyOf at \(path)"
+		case let .stringEnumMismatch(allowed, actual, path):
+			"String enum mismatch at \(path): allowed {\(allowed.joined(separator: ", "))}, got ‘\(actual)’"
+		case let .arrayTooShort(min, actual, path):
+			"Array too short at \(path): min=\(min), actual=\(actual)"
+		case let .arrayTooLong(max, actual, path):
+			"Array too long at \(path): max=\(max), actual=\(actual)"
+		}
+	}
+}
+
+extension JSONSchema {
+	/// Validate a `JSONValue` against this schema.
+	public func validate(json: JSONValue) throws {
+		try JSONSchema._validate(json, against: self, path: "$")
+	}
+
+	/// Recursive worker
+	fileprivate static func _validate(_ json: JSONValue, against schema: JSONSchema, path: String) throws {
+		switch schema {
+		case let .object(properties, required, additionalProperties, _, _, _, _):
+			try validateObject(
+				json: json,
+				properties: properties,
+				required: required,
+				additional: additionalProperties,
+				path: path
+			)
+
+		case let .array(of: itemSchema, minItems, maxItems, _, _, _, _):
+			guard let arr = json.arrayValue else {
+				throw JSONSchemaValidationError.typeMismatch(expected: "array", actual: json.caseName, path: path)
+			}
+			if let min = minItems, arr.count < min {
+				throw JSONSchemaValidationError.arrayTooShort(min: min, actual: arr.count, path: path)
+			}
+			if let max = maxItems, arr.count > max {
+				throw JSONSchemaValidationError.arrayTooLong(max: max, actual: arr.count, path: path)
+			}
+			for (idx, item) in arr.enumerated() {
+				try _validate(item, against: itemSchema, path: "\(path)[\(idx)]")
+			}
+
+		case let .string(pattern, format, _, _, _, _):
+			guard let s = json.stringValue else {
+				throw JSONSchemaValidationError.typeMismatch(expected: "string", actual: json.caseName, path: path)
+			}
+			if let pat = pattern, !pat.isEmpty {
+				if (try? NSRegularExpression(pattern: pat))?
+					.firstMatch(in: s, range: NSRange(location: 0, length: (s as NSString).length)) == nil
+				{
+					throw JSONSchemaValidationError.typeMismatch(expected: "string(pattern: \(pat))", actual: "string(does not match)", path: path)
+				}
+			}
+			_ = format /// The format hint is not validated in the light version
+
+		case .integer:
+			if let n = json.numberValue {
+				if n.rounded(.towardZero) != n {
+					throw JSONSchemaValidationError.typeMismatch(expected: "integer", actual: "number(\(n))", path: path)
+				}
+			} else if json.integerValue != nil {
+				/// OK
+			} else if let s = json.stringValue, let n = Double(s), n.rounded(.towardZero) == n {
+				/// Allow a numerical string if it is an integer
+			} else {
+				throw JSONSchemaValidationError.typeMismatch(expected: "integer", actual: json.caseName, path: path)
+			}
+
+		case .number:
+			if json.numberValue == nil, Double(json.stringValue ?? "") == nil {
+				throw JSONSchemaValidationError.typeMismatch(expected: "number", actual: json.caseName, path: path)
+			}
+
+		case .boolean:
+			guard json.boolValue != nil else {
+				throw JSONSchemaValidationError.typeMismatch(expected: "boolean", actual: json.caseName, path: path)
+			}
+
+		case .null:
+			guard json.isNull else {
+				throw JSONSchemaValidationError.typeMismatch(expected: "null", actual: json.caseName, path: path)
+			}
+
+		case let .anyOf(cases, _):
+			var matched = false
+			for s in cases {
+				if (try? _validate(json, against: s, path: path)) != nil {
+					matched = true
+					break
+				}
+			}
+			if !matched { throw JSONSchemaValidationError.anyOfNoMatch(path: path) }
+
+		case let .enum(cases, _):
+			guard let s = json.stringValue else {
+				throw JSONSchemaValidationError.typeMismatch(expected: "string(enum)", actual: json.caseName, path: path)
+			}
+			if !cases.contains(s) {
+				throw JSONSchemaValidationError.stringEnumMismatch(allowed: cases, actual: s, path: path)
+			}
+		}
+	}
+
+	fileprivate static func validateObject(
+		json: JSONValue,
+		properties: [String: JSONSchema],
+		required: [String]?,
+		additional: JSONSchema?,
+		path: String
+	) throws {
+		guard let dict = json.dictionaryValue else {
+			throw JSONSchemaValidationError.typeMismatch(expected: "object", actual: json.caseName, path: path)
+		}
+
+		/// required
+		if let required {
+			for key in required where dict[key] == nil {
+				throw JSONSchemaValidationError.missingRequiredProperty(name: key, path: path)
+			}
+		}
+
+		/// validate props + unknowns
+		/// (by default, we prohibit if `additionalProperties == nil`)
+		for (key, value) in dict {
+			if let propSchema = properties[key] {
+				try _validate(value, against: propSchema, path: path + "." + key)
+			} else if let add = additional {
+				try _validate(value, against: add, path: path + "." + key)
+			} else {
+				throw JSONSchemaValidationError.unknownProperty(name: key, path: path)
+			}
+		}
+	}
+}
+
+// MARK: - JSONValue helpers used by validator
+
+extension JSONValue {
+	public typealias JDictionary = [String: JSONValue]
+	public typealias JArray = [JSONValue]
+	
+	public var numberValue: Double? 		 { if case let .number(d)  = self { d } else { nil } }
+	public var integerValue: Int? 			 { if case let .integer(i) = self { i } else { nil } }
+	public var boolValue: Bool? 			 { if case let .boolean(b) = self { b } else { nil } }
+	public var stringValue: String? 		 { if case let .string(s)  = self { s } else { nil } }
+	public var arrayValue: JArray? 			 { if case let .array(a)   = self { a } else { nil } }
+	public var dictionaryValue: JDictionary? { if case let .object(o)  = self { o } else { nil } }
+}
