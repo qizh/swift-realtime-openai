@@ -82,6 +82,9 @@ public final class Conversation: @unchecked Sendable {
 	private var mcpListToolsProgress: [String: Item.Status] = [:]
 	private var mcpListToolsLastEventId: [String: String] = [:]
 	
+	private var mcpResponseProgress: [String: Item.Status] = [:]
+	private var mcpResponseLastEventId: [String: String] = [:]
+	
 	/// Latest known status for an MCP list-tools item.
 	/// - Returns: `.inProgress`, `.completed`, `.incomplete`,
 	/// 	or `nil` if we don't know anything about this item yet.
@@ -442,6 +445,11 @@ private extension Conversation {
 		}
 	}
 	
+	func recordMcpResponseProgress(itemId: String, eventId: String, status: Item.Status) {
+		mcpResponseProgress[itemId] = status
+		mcpResponseLastEventId[itemId] = eventId
+	}
+	
 	func handleEvent(_ event: ServerEvent) throws {
 		if debug { logger.debug("Did receive ServerEvent.\(event.caseName)(id: \(event.id))\n\(event)") }
 		
@@ -622,6 +630,15 @@ private extension Conversation {
 		case let .mcpListToolsFailed(eventId, itemId):
 			recordMcpListToolsProgress(itemId: itemId, eventId: eventId, status: .incomplete)
 		
+		case let .responseMCPCallInProgress(eventId, itemId, _):
+			recordMcpResponseProgress(itemId: itemId, eventId: eventId, status: .inProgress)
+		case let .responseMCPCallFailed(eventId, itemId, _):
+			recordMcpResponseProgress(itemId: itemId, eventId: eventId, status: .incomplete)
+			try send(event: .createResponse())
+		case let .responseMCPCallCompleted(eventId, itemId, _):
+			recordMcpResponseProgress(itemId: itemId, eventId: eventId, status: .completed)
+			try send(event: .createResponse())
+			
 		// MARK: Not Handled
 		
 		case .conversationItemRetrieved,
@@ -638,9 +655,9 @@ private extension Conversation {
 			 // .mcpListToolsInProgress,
 			 // .mcpListToolsCompleted,
 			 // .mcpListToolsFailed,
-			 .responseMCPCallInProgress,
-			 .responseMCPCallCompleted,
-			 .responseMCPCallFailed,
+			 // .responseMCPCallInProgress,
+			 // .responseMCPCallCompleted,
+			 // .responseMCPCallFailed,
 			 .rateLimitsUpdated:
 			if debug { logger.warning("Unhandled server event `\(event.caseName)`:\n\(event)") }
 		}
