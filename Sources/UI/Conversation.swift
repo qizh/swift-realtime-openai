@@ -78,13 +78,57 @@ public final class Conversation: @unchecked Sendable {
 	
 	// MARK: ┣ MCP related
 	
-	/// Tracks MCP list-tools state independent of payload (item has no status fields)
-	private var mcpListToolsProgress: [String: Item.Status] = [:]
-	private var mcpListToolsLastEventId: [String: String] = [:]
+	/// Tracks «MCP list-tools» and «MCP response» states independently of payload
+	/// (because item has no status fields).
 	
-	private var mcpResponseProgress: [String: Item.Status] = [:]
-	private var mcpResponseLastEventId: [String: String] = [:]
+	/// MCP list-tools states by Item ID
+	private var mcpListToolsProgress: [Item.ID: Item.Status] = [:]
+	private var mcpListToolsLastEventId: [Item.ID: String] = [:]
 	
+	/// MCP response states by Item ID
+	private var mcpResponseProgress: [Item.ID: Item.Status] = [:]
+	private var mcpResponseLastEventId: [Item.ID: String] = [:]
+	
+	
+	/// Latest known status for the most recent conversation entry.
+	///
+	/// This property inspects the last item in ``entries`` (if any) and returns the most
+	/// up-to-date streaming status associated with that item:
+	/// - If the last entry has an MCP response status tracked, that status is returned.
+	/// - Otherwise, if it has an MCP list-tools status tracked, that status is returned.
+	/// - If no status information is known for the last entry, `nil` is returned.
+	///
+	/// - Note:
+	///   - Status is tracked externally from the item payload via streaming progress maps,
+	///   	so it can reflect in-progress/completed/failed states
+	///   	before the final item arrives.
+	///   - This does not mutate state and runs on the main actor,
+	///   	consistent with ``Conversation``.
+	///
+	/// - Returns:
+	///   `.inProgress`, `.completed`, `.incomplete`, or `nil` if no status is available.
+	///
+	/// - SeeAlso:
+	///   - ``mcpListToolsStatus(for:)`` for querying a specific MCP list-tools item by ID.
+	public var lastMcpEntryStatus: Item.Status? {
+		if let lastEntry = entries.last {
+				mcpResponseProgress[lastEntry.id]
+			?? 	mcpListToolsProgress[lastEntry.id]
+		} else {
+			nil
+		}
+	}
+	
+	public var isMcpToolCallInProgress: Bool {
+		mcpResponseProgress.values.contains(.inProgress)
+	}
+	
+	public var isGettingMcpToolsList: Bool {
+		mcpListToolsProgress.values.contains(.inProgress)
+	}
+	
+	/// It wasn’t really necessary to be publicly or internally available.
+	/*
 	/// Latest known status for an MCP list-tools item.
 	/// - Returns: `.inProgress`, `.completed`, `.incomplete`,
 	/// 	or `nil` if we don't know anything about this item yet.
@@ -115,6 +159,7 @@ public final class Conversation: @unchecked Sendable {
 	public func mcpListToolsLastEventId(for itemId: String) -> String? {
 		mcpListToolsLastEventId[itemId]
 	}
+	*/
 	
 	// MARK: ┣ Messages
 	
