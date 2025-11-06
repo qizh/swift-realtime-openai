@@ -693,8 +693,35 @@ private extension Conversation {
 			 .inputAudioBufferCleared,
 			 .inputAudioBufferTimeoutTriggered,
 			 .responseDone,
+				/// - Example:
+				/// ```json
+				///	{
+				///		"type": "response.output_item.added",
+				///		"eventId": "event_CYqU98TdvHzR3ToIkWRA3",
+				///		"responseId": "resp_CYqU7fGDKVHNPCh2GrMBU",
+				///		"outputIndex": 0,
+				///		"item": {
+				///			"type": "mcp_call",
+				///			"arguments": "",
+				///			"id": "mcp_CYqU9bOnAhM8l9KHxS8C8",
+				///			"name": "airtable_create_records"
+				///		}
+				///	}
+				/// ```
 			 .responseOutputItemAdded,
 			 .responseOutputAudioDone,
+				/// - Example:
+				/// ```json
+				/// {
+				///   "eventId": "event_CYqU9Jp0D6fQZlAYpQ0Ot",
+				///   "outputIndex": 0,
+				///   "responseId": "resp_CYqU7fGDKVHNPCh2GrMBU",
+				///   "itemId": "mcp_CYqU9bOnAhM8l9KHxS8C8",
+				///   "delta": "{",
+				///   "type": "response.mcp_call_arguments.delta",
+				///   "obfuscation": "8laaIXRpITSuL3o"
+				/// }
+				/// ```
 			 .responseMCPCallArgumentsDelta,
 			 .responseMCPCallArgumentsDone,
 			 // .mcpListToolsInProgress,

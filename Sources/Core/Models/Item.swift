@@ -9,7 +9,105 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 	public enum Status: String, Equatable, Hashable, Codable, Sendable {
 		case completed, incomplete, inProgress = "in_progress"
 	}
-
+	
+	/// `mcp_CYqU9bOnAhM8l9KHxS8C8`
+	
+	/**
+		```json
+		{
+		  "eventId": "event_CYqUASJ4Wn2LU3mDS3xRe",
+		  "type": "response.done",
+		  "response": {
+			"id": "resp_CYqU7fGDKVHNPCh2GrMBU",
+			"output": [
+			  {
+				"arguments": "{  \n  \"base_id\": \"appcbXT5jkJG8EMPL\",  \n  \"table_id\": \"tblH3Aqrr8fVrFucD\",  \n  \"records\": [  \n    {  \n      \"fields\": {  \n        \"Name\": \"Disliked Pizza\",  \n        \"Value\": \"Pizza Margherita\",  \n        \"User Identification\": \"Serhii Shevchenko\"  \n      }  \n    }  \n  ]  \n}  \n",
+				"id": "mcp_CYqU9bOnAhM8l9KHxS8C8",
+				"type": "mcp_call",
+				"name": "airtable_create_records"
+			  }
+			],
+			"status": "completed",
+			"conversationId": "conv_CYqOeozWhWrikZMw6h6q6",
+			"usage": {
+			  "totalTokens": 11489,
+			  "inputTokens": 11369,
+			  "outputTokens": 120,
+			  "inputTokenDetails": {
+				"cachedTokensDetails": {
+				  "audioTokens": 0,
+				  "textTokens": 0
+				},
+				"audioTokens": 381,
+				"textTokens": 10988,
+				"cachedTokens": 0
+			  },
+			  "outputTokenDetails": {
+				"audioTokens": 0,
+				"textTokens": 120
+			  }
+			}
+		  }
+		}
+		```
+	 */
+	
+	@IsCase @CaseName @CaseValue
+	public enum MCPCallStep: Hashable, Codable, Sendable {
+		/// ``ServerEvent``.``ServerEvent/conversationItemAdded(eventId:item:previousItemId:)``
+		/// with ``Item`` is ``Item/mcpCall(_:)`` (`type`=`mcp_call`).
+		/// Item's `arguments` usually are empty at this stage.
+		/// It's ``Item/id`` should be saved so it can be found on ``call(_:)``
+		/// or ``response(_:)`` stages.
+		case added
+		/// - When:
+		///   - `response.status` == `"completed"`
+		///   - `response.output[0].type` == `"mcp_call"`
+		///   - `response.output[0].name` -> name of the function called
+		/// - Then:
+		///   - `response.output[0].arguments` should be validated based on the function called
+		
+		/// Item with `type`=`mcp_call` state.
+		/// - ``Item/Status/inProgress`` on ``ServerEvent``.
+		///   ``ServerEvent/responseMCPCallArgumentsDelta(eventId:responseId:itemId:outputIndex:delta:obfuscation:)``
+		///   (`type`=`response.mcp_call_arguments.delta`)
+		/// - ``Item/Status/completed`` on ``ServerEvent``.
+		///   ``ServerEvent/responseMCPCallArgumentsDone(eventId:responseId:itemId:outputIndex:arguments:)
+		///   (`type`=`response.mcp_call_arguments.done`)
+		///   followed by ``ServerEvent``.``ServerEvent/responseDone(eventId:response:)``
+		/// - ``Item/Status/incomplete`` on ``ServerError`` (?)
+		///   (`type`=`response.mcp_call_arguments.???`)
+		case call(_ state: Item.Status)
+		/// `response.mcp_call` state
+		case response(_ state: Item.Status)
+		
+		/// Equals to `.call(.completed)`:
+		/// ``call(_:)`` with ``Item/Status/completed`` value.
+		public static let awaitingForResponse: Self = .call(.completed)
+		
+		/// Whether it was successful or not
+		public var isCallFinished: Bool {
+			self.callstate?.isAmong(.completed, .incomplete) == true
+		}
+		
+		/// Whether it was successful or not
+		public var isResponseFinished: Bool {
+			self.responsestate?.isAmong(.completed, .incomplete) == true
+		}
+		
+		/// Both ``call(_:)`` and ``response(_:)`` have completed
+		public var isComplete: Bool {
+			self == .response(.completed)
+		}
+		
+		/// Either ``call(_:)`` or ``response(_:)`` have failed
+		public var isIncomplete: Bool {
+				self == .call(.incomplete)
+			|| 	self == .response(.incomplete)
+		}
+		
+	}
+	
 	public struct Audio: Equatable, Hashable, Codable, Sendable {
 		/// Audio bytes
 		public var audio: AudioData?
