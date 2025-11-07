@@ -60,13 +60,21 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 		/// It's ``Item/id`` should be saved so it can be found on ``call(_:)``
 		/// or ``response(_:)`` stages.
 		case added
+		/// ## `.call(.completed`
+		///
 		/// - When:
 		///   - `response.status` == `"completed"`
-		///   - `response.output[0].type` == `"mcp_call"`
-		///   - `response.output[0].name` -> name of the function called
 		/// - Then:
-		///   - `response.output[0].arguments` should be validated based on the function called
-		
+		///   - For each object in `response.output` array:
+		///     - If:
+		///       - Object's `type` == `"mcp_call"`
+		///     - Then:
+		///       - Get the name of the function called from `name` field
+		///       - Validate `arguments` based on this MCP Server JSON Schema for this function
+		///
+		/// ## `.call(.inProgress)`
+		///
+		/// - When:
 		/// Item with `type`=`mcp_call` state.
 		/// - ``Item/Status/inProgress`` on ``ServerEvent``.
 		///   ``ServerEvent/responseMCPCallArgumentsDelta(eventId:responseId:itemId:outputIndex:delta:obfuscation:)``
@@ -80,6 +88,14 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 		case call(_ state: Item.Status)
 		/// `response.mcp_call` state
 		case response(_ state: Item.Status)
+		
+		
+		
+		
+		
+		
+		
+		
 		
 		/// Equals to `.call(.completed)`:
 		/// ``call(_:)`` with ``Item/Status/completed`` value.
