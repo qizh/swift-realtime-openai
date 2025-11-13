@@ -10,91 +10,133 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 		case completed, incomplete, inProgress = "in_progress"
 	}
 	
-	/// `mcp_CYqU9bOnAhM8l9KHxS8C8`
-	
-	/**
-		```json
-		{
-		  "eventId": "event_CYqUASJ4Wn2LU3mDS3xRe",
-		  "type": "response.done",
-		  "response": {
-			"id": "resp_CYqU7fGDKVHNPCh2GrMBU",
-			"output": [
-			  {
-				"arguments": "{  \n  \"base_id\": \"appcbXT5jkJG8EMPL\",  \n  \"table_id\": \"tblH3Aqrr8fVrFucD\",  \n  \"records\": [  \n    {  \n      \"fields\": {  \n        \"Name\": \"Disliked Pizza\",  \n        \"Value\": \"Pizza Margherita\",  \n        \"User Identification\": \"Serhii Shevchenko\"  \n      }  \n    }  \n  ]  \n}  \n",
-				"id": "mcp_CYqU9bOnAhM8l9KHxS8C8",
-				"type": "mcp_call",
-				"name": "airtable_create_records"
-			  }
-			],
-			"status": "completed",
-			"conversationId": "conv_CYqOeozWhWrikZMw6h6q6",
-			"usage": {
-			  "totalTokens": 11489,
-			  "inputTokens": 11369,
-			  "outputTokens": 120,
-			  "inputTokenDetails": {
-				"cachedTokensDetails": {
-				  "audioTokens": 0,
-				  "textTokens": 0
-				},
-				"audioTokens": 381,
-				"textTokens": 10988,
-				"cachedTokens": 0
-			  },
-			  "outputTokenDetails": {
-				"audioTokens": 0,
-				"textTokens": 120
-			  }
-			}
-		  }
-		}
-		```
-	 */
-	
+	/// Enumeration used to provide MCP function call,
+	/// which usually follows the following order.
+	///
+	/// - Order:
+	///   1. `.added`
+	///   2. `.call(.inProgress)`
+	///   3. `.call(.completed)` in case of success,
+	///      or `.call(.incomplete)` in case of failure
+	///   4. `.response(.inProgress)`
+	///   5. `.response(.completed)` in case of success,
+	///      or `.response(.incomplete)` in case of failure
+	///
+	/// # Rule 1
+	/// - When:
+	///   - `ServerEvent.responseOutputItemAdded` received where:
+	///     - `type` is `response.output_item.added`
+	///     - `item.type` is `mcp_call`
+	/// - Then:
+	///   - ``Item/MCPCallStep`` should be set to `.added`
+	///   - Called MCP function name can be taken from `item.name`
+	///   - `item.id` is the MCP function call identifier, which can be saved
+	///     to use later if needed to find out which function call
+	///     is in progress or is complete.
+	///
+	/// # Rule 2
+	/// - When:
+	///   - `ServerEvent.conversationItemAdded` received where:
+	///     - `type` is `conversation.item.added`
+	///     - `item.type` is `mcp_call`
+	/// - Then:
+	///   - ``Item/MCPCallStep`` should be set to `.added`
+	///   - Called MCP function name can be taken from `item.name`
+	///   - `item.id` is the MCP function call identifier, which can be saved
+	///     to use later if needed to find out which function call
+	///     is in progress or is complete.
+	///
+	/// # Rule 3
+	/// - When:
+	///   - `ServerEvent.responseMCPCallArgumentsDelta` received where:
+	///     - `type` is `response.mcp_call_arguments.delta`
+	///     - `item.type` is `mcp_call`
+	/// - Then:
+	///   - ``Item/MCPCallStep`` should be set to `.call(.inProgress)`
+	///   - `item.id` is the MCP function call identifier, which can be used
+	///     to find out which function call is in progress or is complete.
+	///     if needed and if saved when Rule 1 or 2 have triggered.
+	///
+	/// # Rule 4
+	/// - When:
+	///   - `ServerEvent.responseMCPCallArgumentsDone` received where:
+	///     - `type` is `response.mcp_call_arguments.done`
+	///     - `item.type` is `mcp_call`
+	/// - Then:
+	///   - ``Item/MCPCallStep`` should be set to `.call(.completed)`
+	///   - Function call item id can be read from `itemId`
+	///   - Called MCP function name can be taken from `item.name`
+	///   - `arguments` should be validated
+	///     for the corresponding name of the function called
+	///
+	/// # Rule 5
+	/// - When:
+	///   - `ServerEvent.responseDone` received where:
+	///     - `type` is `response.done`
+	///     - `response.status` is `"completed"`
+	///     - `response.output` array exists
+	///       and contains objects with `"mcp_call"` value for the object's `type` property.
+	/// - Then:
+	///   - For each object in `response.output` array
+	///     where object's `type` is `"mcp_call"`
+	///     (not `"message"` like in final composed output):
+	///     - Function call item id can be read from `id` (`response.output[].id`)
+	///   	- Called MCP function name can be taken from `name` (`response.output[].name`)
+	///   	- `arguments` should be taken from object's `arguments` property (JSON String)
+	///   	  and validated according to the function name being called.
+	///   	- ``Item/MCPCallStep`` should become `.call(.completed)` in case of successful
+	///   	  validation, or `.call(.incomplete)` in case validation fails.
+	///
+	/// # Rule 6
+	/// - When:
+	///   - `ServerEvent.responseMCPCallInProgress` received where:
+	///     - `type` is `response.mcp_call.in_progress`
+	/// - Then:
+	///   - Function call item id can be read from `itemId`
+	///   - This item id can be then used to get the stored function name
+	///   - ``Item/MCPCallStep`` should become `.call(.inProgress)`
+	///
+	/// # Rule 7
+	/// - When:
+	///   - `ServerEvent.responseMCPCallCompleted` received where:
+	///     - `type` is `response.mcp_call.completed`
+	/// - Then:
+	///   - Function call item id can be read from `itemId`
+	///   - This item id can be then used to get the stored function name
+	///   - ``Item/MCPCallStep`` should stay `.response(.inProgress)` (or just stay unchanged)
+	///     because usually there's no other information in such server event and we should
+	///     wait for the event described in Rule 8.
+	///
+	/// # Rule 8
+	/// - When:
+	///   - `ServerEvent.conversationItemDone` received where:
+	///     - `type` is `conversation.item.done`
+	///     - `item.type` is `"mcp_call"`
+	/// - Then:
+	///   - Function call item id can be read from `item.id`
+	///   - Function call name can be read from `item.name`
+	///   - Function call arguments can be read from `item.arguments` (JSON string)
+	///   - Function call output can be read from `item.output` (JSON string)
+	///     and probably should be logged or even stored (if needed).
+	///   - ``Item/MCPCallStep`` should become `.response(.completed)`
+	///
+	/// # Rule 9
+	/// - When:
+	///   - `ServerEvent.responseOutputItemDone` received where:
+	///     - `type` is `response.output_item.done`
+	///     - `item.type` is `"mcp_call"`
+	/// - Then:
+	///   - Function call item id can be read from `item.id`
+	///   - Function call name can be read from `item.name`
+	///   - Function call arguments can be read from `item.arguments` (JSON string)
+	///   - Function call output can be read from `item.output` (JSON string)
+	///     and probably should be logged or even stored (if needed).
+	///   - ``Item/MCPCallStep`` should become `.response(.completed)`
 	@IsCase @CaseName @CaseValue
 	public enum MCPCallStep: Hashable, Codable, Sendable {
-		/// ``ServerEvent``.``ServerEvent/conversationItemAdded(eventId:item:previousItemId:)``
-		/// with ``Item`` is ``Item/mcpCall(_:)`` (`type`=`mcp_call`).
-		/// Item's `arguments` usually are empty at this stage.
-		/// It's ``Item/id`` should be saved so it can be found on ``call(_:)``
-		/// or ``response(_:)`` stages.
 		case added
-		/// ## `.call(.completed`
-		///
-		/// - When:
-		///   - `response.status` == `"completed"`
-		/// - Then:
-		///   - For each object in `response.output` array:
-		///     - If:
-		///       - Object's `type` == `"mcp_call"`
-		///     - Then:
-		///       - Get the name of the function called from `name` field
-		///       - Validate `arguments` based on this MCP Server JSON Schema for this function
-		///
-		/// ## `.call(.inProgress)`
-		///
-		/// - When:
-		/// Item with `type`=`mcp_call` state.
-		/// - ``Item/Status/inProgress`` on ``ServerEvent``.
-		///   ``ServerEvent/responseMCPCallArgumentsDelta(eventId:responseId:itemId:outputIndex:delta:obfuscation:)``
-		///   (`type`=`response.mcp_call_arguments.delta`)
-		/// - ``Item/Status/completed`` on ``ServerEvent``.
-		///   ``ServerEvent/responseMCPCallArgumentsDone(eventId:responseId:itemId:outputIndex:arguments:)
-		///   (`type`=`response.mcp_call_arguments.done`)
-		///   followed by ``ServerEvent``.``ServerEvent/responseDone(eventId:response:)``
-		/// - ``Item/Status/incomplete`` on ``ServerError`` (?)
-		///   (`type`=`response.mcp_call_arguments.???`)
 		case call(_ state: Item.Status)
-		/// `response.mcp_call` state
 		case response(_ state: Item.Status)
-		
-		
-		
-		
-		
-		
-		
 		
 		
 		/// Equals to `.call(.completed)`:
