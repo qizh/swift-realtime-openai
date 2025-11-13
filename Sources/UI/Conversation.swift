@@ -730,12 +730,34 @@ private extension Conversation {
 				///	}
 				/// ```
 			 .rateLimitsUpdated:
-			if debug { logger.warning("Unhandled server event `\(event.caseName)`:\n\(event)") }
+			logUnhandled(serverEvent: event, shouldBeHandled: false)
 		case let .responseOutputItemAdded(eventId, responseId, outputIndex, item):
+			logUnhandled(serverEvent: event, shouldBeHandled: true)
 		case let .responseOutputAudioDone(eventId, responseId, itemId, outputIndex, contentIndex):
+			logUnhandled(serverEvent: event, shouldBeHandled: true)
 		case let .responseMCPCallArgumentsDelta(eventId, responseId, itemId, outputIndex, delta, obfuscation):
+			logUnhandled(serverEvent: event, shouldBeHandled: true)
 		case let .responseMCPCallArgumentsDone(eventId, responseId, itemId, outputIndex, arguments):
+			logUnhandled(serverEvent: event, shouldBeHandled: true)
 		}
+	}
+	
+	private func logUnhandled(
+		serverEvent event: ServerEvent,
+		shouldBeHandled: Bool
+	) {
+		guard debug else { return }
+		let prettyPrintedEvent = "\(json5: event, encoder: .prettyPrinted)"
+			.components(separatedBy: .newlines)
+			.enumerated()
+			.map { enumerated in (enumerated.offset == 0 ? "" : "  ") + enumerated.element }
+			.joined(separator: "\n")
+		logger.warning("""
+			Unhandled Server Event 
+			┣ case: `ServerEvent.\(event.caseName)`
+			┣ should be handled: \(shouldBeHandled, format: .answer)
+			┗ json: \(prettyPrintedEvent)
+			""")
 	}
 	
 	// MARK: ┗ Update
