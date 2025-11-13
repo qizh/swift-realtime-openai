@@ -547,6 +547,12 @@ private extension Conversation {
 			if case let .mcpCall(call) = item {
 				mcpCallState[call.id] = .response(.completed)
 			}
+		case let .conversationItemDeleted(_, itemId):
+			entries.removeAll { $0.id == itemId }
+			mcpListToolsProgress.removeValue(forKey: itemId)
+			mcpListToolsLastEventId.removeValue(forKey: itemId)
+			mcpCallState.removeValue(forKey: itemId)
+			mcpResponseLastEventId.removeValue(forKey: itemId)
 		
 		// MARK: Response Output Item Added
 		case let .responseOutputItemAdded(eventId, _, _, item):
@@ -741,8 +747,6 @@ private extension Conversation {
 			 .rateLimitsUpdated:
 			log(serverEvent: event, isHandled: false)
 		case let .responseOutputAudioDone(eventId, responseId, itemId, outputIndex, contentIndex):
-			log(serverEvent: event, isHandled: false)
-		case let .conversationItemDeleted(eventId, itemId):
 			log(serverEvent: event, isHandled: false)
 		}
 	}
