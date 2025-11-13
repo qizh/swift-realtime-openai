@@ -503,7 +503,7 @@ private extension Conversation {
 	}
 	
 	func handleEvent(_ event: ServerEvent) throws {
-		if debug { logger.debug("Did receive ServerEvent.\(event.caseName)(id: \(event.id))\n\(event)") }
+		log(serverEvent: event)
 		
 		switch event {
 		
@@ -547,11 +547,19 @@ private extension Conversation {
 			if case let .mcpCall(call) = item {
 				mcpCallState[call.id] = .response(.completed)
 			}
-		case let .conversationItemDeleted(_, itemId):
-			entries.removeAll { $0.id == itemId }
-			mcpListToolsProgress.removeValue(forKey: itemId)
-			mcpListToolsLastEventId.removeValue(forKey: itemId)
-			mcpCallState.removeValue(forKey: itemId)
+		
+		// MARK: Response Output Item Added
+		case let .responseOutputItemAdded(eventId, _, _, item):
+			if case let .mcpCall(call) = item {
+				mcpCallState[call.id] = .added
+				mcpResponseLastEventId[call.id] = eventId
+			}
+			
+		// MARK: MCP Call Args
+		case let .responseMCPCallArgumentsDelta(_, _, itemId, _, _, _):
+			mcpCallState[itemId] = .call(.inProgress)
+		case let .responseMCPCallArgumentsDone(_, _, itemId, _, _):
+			mcpCallState[itemId] = .call(.completed)
 		
 		// MARK: Input Audio Transcription
 		
@@ -713,6 +721,7 @@ private extension Conversation {
 			 .inputAudioBufferCommitted,
 			 .inputAudioBufferCleared,
 			 .inputAudioBufferTimeoutTriggered,
+			 .responseOutputAudioDone,
 			 .responseDone,
 				/// - Example:
 				/// ```json
@@ -730,32 +739,32 @@ private extension Conversation {
 				///	}
 				/// ```
 			 .rateLimitsUpdated:
-			logUnhandled(serverEvent: event, shouldBeHandled: false)
-		case let .responseOutputItemAdded(eventId, responseId, outputIndex, item):
-			logUnhandled(serverEvent: event, shouldBeHandled: true)
+			log(serverEvent: event, isHandled: false)
+		/*
 		case let .responseOutputAudioDone(eventId, responseId, itemId, outputIndex, contentIndex):
-			logUnhandled(serverEvent: event, shouldBeHandled: true)
-		case let .responseMCPCallArgumentsDelta(eventId, responseId, itemId, outputIndex, delta, obfuscation):
-			logUnhandled(serverEvent: event, shouldBeHandled: true)
-		case let .responseMCPCallArgumentsDone(eventId, responseId, itemId, outputIndex, arguments):
-			logUnhandled(serverEvent: event, shouldBeHandled: true)
+			logUnhandled(serverEvent: event, shouldBeHandled: false)
+		*/
+		case let .conversationItemDeleted(eventId, itemId):
+			log(serverEvent: event, isHandled: false)
 		}
 	}
 	
-	private func logUnhandled(
+	private func log(
 		serverEvent event: ServerEvent,
-		shouldBeHandled: Bool
+		isHandled: Bool = true
 	) {
 		guard debug else { return }
+		
 		let prettyPrintedEvent = "\(json5: event, encoder: .prettyPrinted)"
 			.components(separatedBy: .newlines)
 			.enumerated()
 			.map { enumerated in (enumerated.offset == 0 ? "" : "  ") + enumerated.element }
 			.joined(separator: "\n")
+		
 		logger.warning("""
-			Unhandled Server Event 
+			\(isHandled ? "Received" : "Unhandled") Server Event 
 			┣ case: `ServerEvent.\(event.caseName)`
-			┣ should be handled: \(shouldBeHandled, format: .answer)
+			┣ id: \(event.id)`
 			┗ json: \(prettyPrintedEvent)
 			""")
 	}
