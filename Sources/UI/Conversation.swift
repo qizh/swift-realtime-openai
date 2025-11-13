@@ -721,7 +721,7 @@ private extension Conversation {
 			 .inputAudioBufferCommitted,
 			 .inputAudioBufferCleared,
 			 .inputAudioBufferTimeoutTriggered,
-			 .responseOutputAudioDone,
+			 // .responseOutputAudioDone,
 			 .responseDone,
 				/// - Example:
 				/// ```json
@@ -740,10 +740,8 @@ private extension Conversation {
 				/// ```
 			 .rateLimitsUpdated:
 			log(serverEvent: event, isHandled: false)
-		/*
 		case let .responseOutputAudioDone(eventId, responseId, itemId, outputIndex, contentIndex):
-			logUnhandled(serverEvent: event, shouldBeHandled: false)
-		*/
+			log(serverEvent: event, isHandled: false)
 		case let .conversationItemDeleted(eventId, itemId):
 			log(serverEvent: event, isHandled: false)
 		}
@@ -761,12 +759,15 @@ private extension Conversation {
 			.map { enumerated in (enumerated.offset == 0 ? "" : "  ") + enumerated.element }
 			.joined(separator: "\n")
 		
-		logger.warning("""
+		logger.log(
+			level: isHandled ? .error : .debug,
+			"""
 			\(isHandled ? "Received" : "Unhandled") Server Event 
 			┣ case: `ServerEvent.\(event.caseName)`
 			┣ id: \(event.id)`
 			┗ json: \(prettyPrintedEvent)
-			""")
+			"""
+		)
 	}
 	
 	// MARK: ┗ Update
