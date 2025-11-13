@@ -164,6 +164,19 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 			|| 	self == .response(.incomplete)
 		}
 		
+		public var isInProgress: Bool {
+				self.responsestate == .inProgress
+			|| 	self.callstate != .incomplete
+			|| 	self == .added
+		}
+		
+		public var status: Item.Status? {
+			switch self {
+			case .added: 				nil
+			case .call(let status): 	status
+			case .response(let status): status
+			}
+		}
 	}
 	
 	public struct Audio: Equatable, Hashable, Codable, Sendable {

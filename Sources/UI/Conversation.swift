@@ -85,8 +85,8 @@ public final class Conversation: @unchecked Sendable {
 	private var mcpListToolsProgress: [Item.ID: Item.Status] = [:]
 	private var mcpListToolsLastEventId: [Item.ID: String] = [:]
 	
-	/// MCP response states by Item ID
-	private var mcpResponseProgress: [Item.ID: Item.Status] = [:]
+	/// MCP response states by Item ID replaced by MCP call states
+	private var mcpCallState: [Item.ID: Item.MCPCallStep] = [:]
 	private var mcpResponseLastEventId: [Item.ID: String] = [:]
 	
 	
@@ -112,15 +112,22 @@ public final class Conversation: @unchecked Sendable {
 	///   - ``mcpListToolsStatus(for:)`` for querying a specific MCP list-tools item by ID.
 	public var lastMcpEntryStatus: Item.Status? {
 		if let lastEntry = entries.last {
-				mcpResponseProgress[lastEntry.id]
+				mcpCallState[lastEntry.id]?.status
 			?? 	mcpListToolsProgress[lastEntry.id]
+			/*
+			if let callStep = mcpCallState[lastEntry.id] {
+				callStep.status
+			} else {
+				mcpListToolsProgress[lastEntry.id]
+			}
+			 */
 		} else {
 			nil
 		}
 	}
 	
 	public var isMcpToolCallInProgress: Bool {
-		mcpResponseProgress.values.contains(.inProgress)
+		mcpCallState.values.contains(where: \.isInProgress)
 	}
 	
 	public var isGettingMcpToolsList: Bool {
@@ -491,7 +498,7 @@ private extension Conversation {
 	}
 	
 	func recordMcpResponseProgress(itemId: String, eventId: String, status: Item.Status) {
-		mcpResponseProgress[itemId] = status
+		mcpCallState[itemId] = .call(status)
 		mcpResponseLastEventId[itemId] = eventId
 	}
 	
@@ -522,6 +529,9 @@ private extension Conversation {
 			entries.append(item)
 		case let .conversationItemAdded(_, item, _):
 			entries.append(item)
+			if case let .mcpCall(call) = item {
+				mcpCallState[call.id] = .added
+			}
 		case let .conversationItemDone(_, item, _):
 			/// Update the existing item with the completed version
 			if let index = entries.firstIndex(where: { $0.id == item.id }) {
@@ -534,10 +544,14 @@ private extension Conversation {
 				mcpListToolsProgress[item.id] = .completed
 				mcpListToolsLastEventId[item.id] = event.id
 			}
+			if case let .mcpCall(call) = item {
+				mcpCallState[call.id] = .response(.completed)
+			}
 		case let .conversationItemDeleted(_, itemId):
 			entries.removeAll { $0.id == itemId }
 			mcpListToolsProgress.removeValue(forKey: itemId)
 			mcpListToolsLastEventId.removeValue(forKey: itemId)
+			mcpCallState.removeValue(forKey: itemId)
 		
 		// MARK: Input Audio Transcription
 		
@@ -608,10 +622,12 @@ private extension Conversation {
 		// MARK: Function Call Args
 		
 		case let .responseFunctionCallArgumentsDelta(_, _, itemId, _, _, delta):
+			mcpCallState[itemId] = .call(.inProgress)
 			updateEventFunctionCall(id: itemId) { functionCall in
 				functionCall.arguments.append(delta)
 			}
 		case let .responseFunctionCallArgumentsDone(_, _, itemId, _, _, arguments):
+			mcpCallState[itemId] = .call(.completed)
 			updateEventFunctionCall(id: itemId) { functionCall in
 				functionCall.arguments = arguments
 			}
@@ -651,6 +667,9 @@ private extension Conversation {
 				guard case let .message(newMessage) = item else { return }
 				message = newMessage
 			}
+			if case let .mcpCall(call) = item {
+				mcpCallState[call.id] = .response(.completed)
+			}
 		
 		// MARK: Truncated
 		
@@ -676,13 +695,15 @@ private extension Conversation {
 			recordMcpListToolsProgress(itemId: itemId, eventId: eventId, status: .incomplete)
 		
 		case let .responseMCPCallInProgress(eventId, itemId, _):
-			recordMcpResponseProgress(itemId: itemId, eventId: eventId, status: .inProgress)
+			mcpCallState[itemId] = .call(.inProgress)
+			mcpResponseLastEventId[itemId] = eventId
 		case let .responseMCPCallFailed(eventId, itemId, _):
-			recordMcpResponseProgress(itemId: itemId, eventId: eventId, status: .incomplete)
+			mcpCallState[itemId] = .call(.incomplete)
+			mcpResponseLastEventId[itemId] = eventId
 			try send(event: .createResponse())
 		case let .responseMCPCallCompleted(eventId, itemId, _):
-			recordMcpResponseProgress(itemId: itemId, eventId: eventId, status: .completed)
-			try send(event: .createResponse())
+			/// leave state unchanged as per instruction
+			mcpResponseLastEventId[itemId] = eventId
 			
 		// MARK: Not Handled
 		
@@ -708,30 +729,12 @@ private extension Conversation {
 				///		}
 				///	}
 				/// ```
-			 .responseOutputItemAdded,
-			 .responseOutputAudioDone,
-				/// - Example:
-				/// ```json
-				/// {
-				///   "eventId": "event_CYqU9Jp0D6fQZlAYpQ0Ot",
-				///   "outputIndex": 0,
-				///   "responseId": "resp_CYqU7fGDKVHNPCh2GrMBU",
-				///   "itemId": "mcp_CYqU9bOnAhM8l9KHxS8C8",
-				///   "delta": "{",
-				///   "type": "response.mcp_call_arguments.delta",
-				///   "obfuscation": "8laaIXRpITSuL3o"
-				/// }
-				/// ```
-			 .responseMCPCallArgumentsDelta,
-			 .responseMCPCallArgumentsDone,
-			 // .mcpListToolsInProgress,
-			 // .mcpListToolsCompleted,
-			 // .mcpListToolsFailed,
-			 // .responseMCPCallInProgress,
-			 // .responseMCPCallCompleted,
-			 // .responseMCPCallFailed,
 			 .rateLimitsUpdated:
 			if debug { logger.warning("Unhandled server event `\(event.caseName)`:\n\(event)") }
+		case let .responseOutputItemAdded(eventId, responseId, outputIndex, item):
+		case let .responseOutputAudioDone(eventId, responseId, itemId, outputIndex, contentIndex):
+		case let .responseMCPCallArgumentsDelta(eventId, responseId, itemId, outputIndex, delta, obfuscation):
+		case let .responseMCPCallArgumentsDone(eventId, responseId, itemId, outputIndex, arguments):
 		}
 	}
 	
