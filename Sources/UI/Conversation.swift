@@ -632,6 +632,13 @@ private extension Conversation {
 				guard case let .audio(audio) = message.content[contentIndex] else { return }
 				message.content[contentIndex] = .audio(.init(audio: (audio.audio?.data ?? Data()) + delta.data, transcript: audio.transcript))
 			}
+
+        case let .responseOutputAudioDone(_, _, itemId, _, _):
+            /// Server finished sending output audio for this item.
+			/// Clear active playing tracking if matching.
+            if playingItemID == itemId {
+                playingItemID = nil
+            }
 		
 		// MARK: Function Call Args
 		
@@ -746,8 +753,6 @@ private extension Conversation {
 				/// ```
 			 .rateLimitsUpdated:
 			log(serverEvent: event, isHandled: false)
-		case let .responseOutputAudioDone(eventId, responseId, itemId, outputIndex, contentIndex):
-			log(serverEvent: event, isHandled: false)
 		}
 	}
 	
@@ -764,7 +769,7 @@ private extension Conversation {
 			.joined(separator: "\n")
 		
 		logger.log(
-			level: isHandled ? .error : .debug,
+			level: isHandled ? .debug : .error,
 			"""
 			\(isHandled ? "Received" : "Unhandled") Server Event 
 			┣ case: `ServerEvent.\(event.caseName)`
