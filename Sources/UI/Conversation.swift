@@ -643,12 +643,14 @@ private extension Conversation {
 		// MARK: Function Call Args
 		
 		case let .responseFunctionCallArgumentsDelta(_, _, itemId, _, _, delta):
-			mcpCallState[itemId] = .call(.inProgress)
+			/// Removed `mcpCallState` update here
+			/// to avoid polluting MCP tracking for non-MCP function calls
 			updateEventFunctionCall(id: itemId) { functionCall in
 				functionCall.arguments.append(delta)
 			}
 		case let .responseFunctionCallArgumentsDone(_, _, itemId, _, _, arguments):
-			mcpCallState[itemId] = .call(.completed)
+			/// Removed `mcpCallState` update here
+			/// to avoid polluting MCP tracking for non-MCP function calls
 			updateEventFunctionCall(id: itemId) { functionCall in
 				functionCall.arguments = arguments
 			}

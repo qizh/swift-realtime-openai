@@ -165,9 +165,16 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 		}
 		
 		public var isInProgress: Bool {
-				self.responsestate == .inProgress
-			|| 	self.callstate != .incomplete
-			|| 	self == .added
+			switch self {
+			case .added: true
+			case .call(let state):
+				/// In progress until the call fails;
+				/// completed call still awaits response
+				state != .incomplete
+			case .response(let state):
+				/// Only in-progress while the response is streaming
+				state == .inProgress
+			}
 		}
 		
 		public var status: Item.Status? {
