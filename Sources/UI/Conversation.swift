@@ -739,7 +739,7 @@ private extension Conversation {
 			
 			if case let .mcpCall(call) = item {
 				mcpCallState[call.id] = .response(.completed)
-				if debug { logger.debug("Sending `createResponse` after MCP output item done for id: \(call.id)") }
+				if debug { logger.debug("Sending `createResponse` after MCP output item done for id: \(call.id) with status: .completed") }
 				try send(event: .createResponse())
 			}
 		
