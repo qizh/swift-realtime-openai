@@ -114,18 +114,64 @@ public final class Conversation: @unchecked Sendable {
 		if let lastEntry = entries.last {
 				mcpCallState[lastEntry.id]?.status
 			?? 	mcpListToolsProgress[lastEntry.id]
-			/*
-			if let callStep = mcpCallState[lastEntry.id] {
-				callStep.status
-			} else {
-				mcpListToolsProgress[lastEntry.id]
-			}
-			 */
 		} else {
 			nil
 		}
 	}
 	
+	/// Returns whether a given MCP tool-call item has finished its "call preparation" phase.
+	///
+	/// This checks the tracked MCP call state for the provided item identifier and reports
+	/// true only when the state is `.call(.completed)`. Any other state (including missing
+	/// state, in-progress, incomplete, or response phases) returns false.
+	///
+	/// - Parameter itemId: The identifier of the MCP tool-call conversation item to query.
+	/// - Returns: `true` if the tool call is prepared (i.e., call phase is completed);
+	///     otherwise `false`.
+	/// - Note:
+	///   - This does not inspect the conversation entries directly; it relies on
+	///     the streaming progress tracked in `mcpCallState`.
+	///   - Use this to enable UI that depends on tool-call readiness before execution
+	///     or response handling.
+	/// - SeeAlso: ``isMcpToolCallInProgress`` for checking if any MCP tool-call
+	///   is currently running.
+	public func isMcpToolCallArgumentsPrepared(for itemId: String) -> Bool {
+		if let state = mcpCallState[itemId] {
+			switch state {
+			case .call(.completed): true
+			default: 				false
+			}
+		} else {
+			false
+		}
+	}
+	
+	/// Indicates whether any MCP tool-call is currently in progress.
+	///
+	/// This property inspects the internally tracked MCP call states for all
+	/// conversation items and returns true if at least one item is in an
+	/// in-progress phase. It does not require that the final item payload has
+	/// been received yet; it relies on streaming progress updates recorded in
+	/// `mcpCallState`.
+	///
+	/// - Returns:
+	///   - `true` when any `Item.MCPCallStep` reports `isInProgress == true`.
+	///   - `false` when no MCP tool-call is currently running or if no MCP
+	///     call state has been recorded.
+	///
+	/// - Use cases:
+	///   - Drive UI indicators (e.g., spinners or disabled buttons) while the
+	///     model prepares or executes an MCP tool call.
+	///   - Gate user interactions that should only proceed once MCP execution
+	///     has completed.
+	///
+	/// - Threading:
+	///   - `Conversation` is `@MainActor`; read this property on the main thread.
+	///
+	/// - SeeAlso:
+	///   - ``isMcpToolCallPrepared(for:)`` to check whether a specific MCP tool-call
+	///     has completed its preparation phase.
+	///   - ``lastMcpEntryStatus`` for the latest known status of the most recent entry.
 	public var isMcpToolCallInProgress: Bool {
 		mcpCallState.values.contains(where: \.isInProgress)
 	}
