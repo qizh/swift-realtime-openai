@@ -86,7 +86,7 @@ public final class Conversation: @unchecked Sendable {
 	private var mcpListToolsLastEventId: [Item.ID: String] = [:]
 	
 	/// MCP response states by Item ID replaced by MCP call states
-	private var mcpCallState: [Item.ID: Item.MCPCallStep] = [:]
+	public fileprivate(set) var mcpCallState: [Item.ID: Item.MCPCallStep] = [:]
 	private var mcpResponseLastEventId: [Item.ID: String] = [:]
 	
 	
@@ -736,8 +736,11 @@ private extension Conversation {
 				guard case let .message(newMessage) = item else { return }
 				message = newMessage
 			}
+			
 			if case let .mcpCall(call) = item {
 				mcpCallState[call.id] = .response(.completed)
+				if debug { logger.debug("Sending `createResponse` after MCP output item done for id: \(call.id)") }
+				try send(event: .createResponse())
 			}
 		
 		// MARK: Truncated
@@ -782,23 +785,7 @@ private extension Conversation {
 			 .inputAudioBufferCommitted,
 			 .inputAudioBufferCleared,
 			 .inputAudioBufferTimeoutTriggered,
-			 // .responseOutputAudioDone,
 			 .responseDone,
-				/// - Example:
-				/// ```json
-				///	{
-				///		"type": "response.output_item.added",
-				///		"eventId": "event_CYqU98TdvHzR3ToIkWRA3",
-				///		"responseId": "resp_CYqU7fGDKVHNPCh2GrMBU",
-				///		"outputIndex": 0,
-				///		"item": {
-				///			"type": "mcp_call",
-				///			"arguments": "",
-				///			"id": "mcp_CYqU9bOnAhM8l9KHxS8C8",
-				///			"name": "airtable_create_records"
-				///		}
-				///	}
-				/// ```
 			 .rateLimitsUpdated:
 			log(serverEvent: event, isHandled: false)
 		}

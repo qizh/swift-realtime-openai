@@ -2,6 +2,77 @@ import Foundation
 import MetaCodable
 import QizhMacroKit
 
+/// A discriminated union representing a single item in a Realtime conversation.
+///
+/// Item is the central model used to describe everything that can appear in a conversation:
+/// user/assistant/system messages, tool/function calls and their outputs, as well as
+/// Model Context Protocol (MCP) interactions such as tool calls, approval requests,
+/// and tool listings.
+///
+/// Encoding and type tagging:
+/// - Item conforms to Codable and is tagged by a "type" field (via @CodedAt("type")).
+/// - Each case is encoded/decoded using a specific type string (e.g. "message",
+///   "function_call", "mcp_call", etc.), allowing round‑trippable interchange with
+///   Realtime server events and responses.
+///
+/// Thread-safety and identity:
+/// - Conforms to Identifiable, Equatable, Hashable, and Sendable for use in Swift
+///   concurrency contexts and collections.
+/// - The stable identifier is surfaced via the computed `id` property and is forwarded
+///   from the associated value of each case.
+///
+/// Nested types:
+/// - Audio: A simple container for audio bytes and an optional transcript. Used by content payloads.
+/// - ContentPart: A compact content fragment used in request/response assembly (text or audio).
+/// - Message: A user/assistant/system message composed of one or more content parts.
+///   - Role: The message author (system, assistant, user).
+///   - Content: A message content element. Supports input/output text and input/output audio,
+///     and provides a convenience `text` accessor that resolves transcripts when relevant.
+/// - FunctionCall: A function invocation emitted by the model during a conversation.
+/// - FunctionCallOutput: The textual output returned by a previously emitted function call.
+/// - MCPCall: A single MCP call item capturing server label, tool/function name, arguments,
+///   output, error, and approval linkage. Arguments/output are JSON values for flexibility.
+/// - MCPToolCall: An invocation of a tool on an MCP server with arguments, optional output,
+///   and structured error information.
+/// - MCPApprovalRequest: A request for human approval before running an MCP tool.
+/// - MCPApprovalResponse: A response to an approval request indicating approval/denial and reason.
+/// - MCPListTools: A listing of tools available on an MCP server, including optional annotations
+///   such as idempotency, destructive hints, and read-only behavior.
+/// - Status: A lightweight lifecycle indicator for items (`inProgress`, `incomplete`, `completed`),
+///   also Comparable by declaration order.
+/// - MCPCallStep: A high-level state machine for MCP call progress, capturing both call and response
+///   phases with convenience flags such as `isComplete`, `isInProgress`, and `awaitingForResponse`.
+///
+/// Typical flows:
+/// - Message generation: The model emits `.message` items with one or more content elements.
+/// - Tool invocation: The model emits `.functionCall` or `.mcpCall` items (depending on the integration),
+///   followed by `.functionCallOutput`, `.mcpToolCall`, approval requests/responses, or tool listings.
+/// - MCP sequencing: Use `MCPCallStep` to track call arguments streaming, completion, and the subsequent
+///   response phase. The documentation within `MCPCallStep` enumerates how to interpret server events
+///   and update UI/state accordingly.
+///
+/// - Cases:
+///   - `message`: A standard conversation message with role and rich content.
+///   - `functionCall`: A function call emitted by the model (legacy/tooling flow).
+///   - `functionCallOutput`: The output text produced by a function call.
+///   - `mcpCall`: An MCP call item representing a tool/function invocation with JSON arguments/output and optional error/approval information.
+///   - `mcpToolCall`: A concrete tool invocation on an MCP server, including arguments, optional output, and structured error.
+///   - `mcpApprovalRequest`: A request to the user to approve running an MCP tool with provided arguments.
+///   - `mcpApprovalResponse`: The user’s approval/denial response, optionally including a reason.
+///   - `mcpListTools`: A listing of tools exposed by an MCP server, including optional annotations.
+///
+/// - Computed properties:
+///   - id: Forwards the stable identifier from the associated value of the active case, ensuring uniform identity semantics across item kinds.
+///
+/// - Usage notes:
+///   - Prefer using `Item.Status` and `Item.MCPCallStep` to drive UI state (streaming, done, error).
+///   - When handling MCP events, map server event types to `MCPCallStep` using the documented rules in `MCPCallStep` to keep your state machine consistent.
+///   - For content handling, `Item.Message.Content` provides a `text` convenience that returns the actual text or the audio transcript when applicable, simplifying rendering logic.
+///
+/// - Interop:
+///   - The Codable implementation for content elements uses explicit "type" tagging
+///     (e.g. "text", "input_text", "output_audio", "input_audio") to match expected server formats.
+///   - `JSONValue` and `JSONSchema` are used to represent flexible, schema-driven MCP payloads.
 @IsCase @CaseName @CaseValue
 @Codable @CodedAt("type")
 public enum Item: Identifiable, Equatable, Hashable, Sendable {
@@ -413,11 +484,12 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 	/// A function call output item in a Realtime conversation.
 	@CodedAs("function_call_output")
 	case functionCallOutput(FunctionCallOutput)
-
+	
+	/// A Realtime item representing a tool/function invocation with JSON arguments/output and optional error/approval information.
 	@CodedAs("mcp_call")
 	case mcpCall(MCPCall)
 	
-	/// A Realtime item representing an invocation of a tool on an MCP server.
+	/// A Realtime item representing a concrete tool invocation on an MCP server, including arguments, optional output, and structured error.
 	@CodedAs("mcp_tool_call")
 	case mcpToolCall(MCPToolCall)
 
@@ -450,7 +522,7 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 // MARK: Item +⃣ Status
 
 extension Item {
-	@IsCase
+	@IsCase @CaseName
 	public enum Status: String, Hashable, Sendable, CaseIterable, Codable {
 		/// Just added or actually in progress
 		case inProgress = "in_progress"
@@ -673,6 +745,18 @@ extension Item.MCPCallStep: Comparable {
     public static func < (lhs: Self, rhs: Self) -> Bool {
 		(Self.allCases.firstIndex(of: lhs) ?? 0) < (Self.allCases.firstIndex(of: rhs) ?? 0)
     }
+}
+
+// MARK: :⃣ Comparable
+
+extension Item.MCPCallStep: CustomStringConvertible {
+	public var description: String {
+		if let status {
+			"\(caseName)(\(status.caseName))"
+		} else {
+			caseName
+		}
+	}
 }
 
 // MARK: Helpers
