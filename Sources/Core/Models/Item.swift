@@ -5,187 +5,6 @@ import QizhMacroKit
 @IsCase @CaseName @CaseValue
 @Codable @CodedAt("type")
 public enum Item: Identifiable, Equatable, Hashable, Sendable {
-	@IsCase
-	public enum Status: String, Equatable, Hashable, Codable, Sendable {
-		case completed, incomplete, inProgress = "in_progress"
-	}
-	
-	/// Enumeration used to provide MCP function call,
-	/// which usually follows the following order.
-	///
-	/// - Order:
-	///   1. `.added`
-	///   2. `.call(.inProgress)`
-	///   3. `.call(.completed)` in case of success,
-	///      or `.call(.incomplete)` in case of failure
-	///   4. `.response(.inProgress)`
-	///   5. `.response(.completed)` in case of success,
-	///      or `.response(.incomplete)` in case of failure
-	///
-	/// # Rule 1
-	/// - When:
-	///   - `ServerEvent.responseOutputItemAdded` received where:
-	///     - `type` is `response.output_item.added`
-	///     - `item.type` is `mcp_call`
-	/// - Then:
-	///   - ``Item/MCPCallStep`` should be set to `.added`
-	///   - Called MCP function name can be taken from `item.name`
-	///   - `item.id` is the MCP function call identifier, which can be saved
-	///     to use later if needed to find out which function call
-	///     is in progress or is complete.
-	///
-	/// # Rule 2
-	/// - When:
-	///   - `ServerEvent.conversationItemAdded` received where:
-	///     - `type` is `conversation.item.added`
-	///     - `item.type` is `mcp_call`
-	/// - Then:
-	///   - ``Item/MCPCallStep`` should be set to `.added`
-	///   - Called MCP function name can be taken from `item.name`
-	///   - `item.id` is the MCP function call identifier, which can be saved
-	///     to use later if needed to find out which function call
-	///     is in progress or is complete.
-	///
-	/// # Rule 3
-	/// - When:
-	///   - `ServerEvent.responseMCPCallArgumentsDelta` received where:
-	///     - `type` is `response.mcp_call_arguments.delta`
-	///     - `item.type` is `mcp_call`
-	/// - Then:
-	///   - ``Item/MCPCallStep`` should be set to `.call(.inProgress)`
-	///   - `item.id` is the MCP function call identifier, which can be used
-	///     to find out which function call is in progress or is complete.
-	///     if needed and if saved when Rule 1 or 2 have triggered.
-	///
-	/// # Rule 4
-	/// - When:
-	///   - `ServerEvent.responseMCPCallArgumentsDone` received where:
-	///     - `type` is `response.mcp_call_arguments.done`
-	///     - `item.type` is `mcp_call`
-	/// - Then:
-	///   - ``Item/MCPCallStep`` should be set to `.call(.completed)`
-	///   - Function call item id can be read from `itemId`
-	///   - Called MCP function name can be taken from `item.name`
-	///   - `arguments` should be validated
-	///     for the corresponding name of the function called
-	///
-	/// # Rule 5
-	/// - When:
-	///   - `ServerEvent.responseDone` received where:
-	///     - `type` is `response.done`
-	///     - `response.status` is `"completed"`
-	///     - `response.output` array exists
-	///       and contains objects with `"mcp_call"` value for the object's `type` property.
-	/// - Then:
-	///   - For each object in `response.output` array
-	///     where object's `type` is `"mcp_call"`
-	///     (not `"message"` like in final composed output):
-	///     - Function call item id can be read from `id` (`response.output[].id`)
-	///   	- Called MCP function name can be taken from `name` (`response.output[].name`)
-	///   	- `arguments` should be taken from object's `arguments` property (JSON String)
-	///   	  and validated according to the function name being called.
-	///   	- ``Item/MCPCallStep`` should become `.call(.completed)` in case of successful
-	///   	  validation, or `.call(.incomplete)` in case validation fails.
-	///
-	/// # Rule 6
-	/// - When:
-	///   - `ServerEvent.responseMCPCallInProgress` received where:
-	///     - `type` is `response.mcp_call.in_progress`
-	/// - Then:
-	///   - Function call item id can be read from `itemId`
-	///   - This item id can be then used to get the stored function name
-	///   - ``Item/MCPCallStep`` should become `.call(.inProgress)`
-	///
-	/// # Rule 7
-	/// - When:
-	///   - `ServerEvent.responseMCPCallCompleted` received where:
-	///     - `type` is `response.mcp_call.completed`
-	/// - Then:
-	///   - Function call item id can be read from `itemId`
-	///   - This item id can be then used to get the stored function name
-	///   - ``Item/MCPCallStep`` should stay `.response(.inProgress)` (or just stay unchanged)
-	///     because usually there's no other information in such server event and we should
-	///     wait for the event described in Rule 8.
-	///
-	/// # Rule 8
-	/// - When:
-	///   - `ServerEvent.conversationItemDone` received where:
-	///     - `type` is `conversation.item.done`
-	///     - `item.type` is `"mcp_call"`
-	/// - Then:
-	///   - Function call item id can be read from `item.id`
-	///   - Function call name can be read from `item.name`
-	///   - Function call arguments can be read from `item.arguments` (JSON string)
-	///   - Function call output can be read from `item.output` (JSON string)
-	///     and probably should be logged or even stored (if needed).
-	///   - ``Item/MCPCallStep`` should become `.response(.completed)`
-	///
-	/// # Rule 9
-	/// - When:
-	///   - `ServerEvent.responseOutputItemDone` received where:
-	///     - `type` is `response.output_item.done`
-	///     - `item.type` is `"mcp_call"`
-	/// - Then:
-	///   - Function call item id can be read from `item.id`
-	///   - Function call name can be read from `item.name`
-	///   - Function call arguments can be read from `item.arguments` (JSON string)
-	///   - Function call output can be read from `item.output` (JSON string)
-	///     and probably should be logged or even stored (if needed).
-	///   - ``Item/MCPCallStep`` should become `.response(.completed)`
-	@IsCase @CaseName @CaseValue
-	public enum MCPCallStep: Hashable, Codable, Sendable {
-		case added
-		case call(_ state: Item.Status)
-		case response(_ state: Item.Status)
-		
-		
-		/// Equals to `.call(.completed)`:
-		/// ``call(_:)`` with ``Item/Status/completed`` value.
-		public static let awaitingForResponse: Self = .call(.completed)
-		
-		/// Whether it was successful or not
-		public var isCallFinished: Bool {
-			self.callstate?.isAmong(.completed, .incomplete) == true
-		}
-		
-		/// Whether it was successful or not
-		public var isResponseFinished: Bool {
-			self.responsestate?.isAmong(.completed, .incomplete) == true
-		}
-		
-		/// Both ``call(_:)`` and ``response(_:)`` have completed
-		public var isComplete: Bool {
-			self == .response(.completed)
-		}
-		
-		/// Either ``call(_:)`` or ``response(_:)`` have failed
-		public var isIncomplete: Bool {
-				self == .call(.incomplete)
-			|| 	self == .response(.incomplete)
-		}
-		
-		public var isInProgress: Bool {
-			switch self {
-			case .added: true
-			case .call(let state):
-				/// In progress until the call fails;
-				/// completed call still awaits response
-				state != .incomplete
-			case .response(let state):
-				/// Only in-progress while the response is streaming
-				state == .inProgress
-			}
-		}
-		
-		public var status: Item.Status? {
-			switch self {
-			case .added: 				nil
-			case .call(let status): 	status
-			case .response(let status): status
-			}
-		}
-	}
-	
 	public struct Audio: Equatable, Hashable, Codable, Sendable {
 		/// Audio bytes
 		public var audio: AudioData?
@@ -626,6 +445,234 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 			case let .mcpCall(mcpCall): mcpCall.id
 		}
 	}
+}
+
+// MARK: Item +⃣ Status
+
+extension Item {
+	@IsCase
+	public enum Status: String, Hashable, Sendable, CaseIterable, Codable {
+		/// Just added or actually in progress
+		case inProgress = "in_progress"
+		/// Failed or Stopped
+		case incomplete
+		/// Successfully completed
+		case completed
+	}
+}
+
+// MARK: :⃣ Comparable
+
+extension Item.Status: Comparable {
+	/// Orders statuses by their declaration order in `CaseIterable`:
+	/// `inProgress` ← `incomplete` ← `completed`
+	public static func < (lhs: Self, rhs: Self) -> Bool {
+		(Self.allCases.firstIndex(of: lhs) ?? 0) < (Self.allCases.firstIndex(of: rhs) ?? 0)
+	}
+}
+
+// MARK: Item +⃣ MCP Call Step
+
+extension Item {
+	/// Enumeration used to provide MCP function call,
+	/// which usually follows the following order.
+	///
+	/// - Order:
+	///   1. `.added`
+	///   2. `.call(.inProgress)`
+	///   3. `.call(.incomplete)` in case of failure,
+	///      or `.call(.completed)` in case of success
+	///   4. `.response(.inProgress)`
+	///   5. `.response(.incomplete)` in case of failure,
+	///      or `.response(.completed)` in case of success
+	///
+	/// # Rule 1
+	/// - When:
+	///   - `ServerEvent.responseOutputItemAdded` received where:
+	///     - `type` is `response.output_item.added`
+	///     - `item.type` is `mcp_call`
+	/// - Then:
+	///   - ``Item/MCPCallStep`` should be set to `.added`
+	///   - Called MCP function name can be taken from `item.name`
+	///   - `item.id` is the MCP function call identifier, which can be saved
+	///     to use later if needed to find out which function call
+	///     is in progress or is complete.
+	///
+	/// # Rule 2
+	/// - When:
+	///   - `ServerEvent.conversationItemAdded` received where:
+	///     - `type` is `conversation.item.added`
+	///     - `item.type` is `mcp_call`
+	/// - Then:
+	///   - ``Item/MCPCallStep`` should be set to `.added`
+	///   - Called MCP function name can be taken from `item.name`
+	///   - `item.id` is the MCP function call identifier, which can be saved
+	///     to use later if needed to find out which function call
+	///     is in progress or is complete.
+	///
+	/// # Rule 3
+	/// - When:
+	///   - `ServerEvent.responseMCPCallArgumentsDelta` received where:
+	///     - `type` is `response.mcp_call_arguments.delta`
+	///     - `item.type` is `mcp_call`
+	/// - Then:
+	///   - ``Item/MCPCallStep`` should be set to `.call(.inProgress)`
+	///   - `item.id` is the MCP function call identifier, which can be used
+	///     to find out which function call is in progress or is complete.
+	///     if needed and if saved when Rule 1 or 2 have triggered.
+	///
+	/// # Rule 4
+	/// - When:
+	///   - `ServerEvent.responseMCPCallArgumentsDone` received where:
+	///     - `type` is `response.mcp_call_arguments.done`
+	///     - `item.type` is `mcp_call`
+	/// - Then:
+	///   - ``Item/MCPCallStep`` should be set to `.call(.completed)`
+	///   - Function call item id can be read from `itemId`
+	///   - Called MCP function name can be taken from `item.name`
+	///   - `arguments` should be validated
+	///     for the corresponding name of the function called
+	///
+	/// # Rule 5
+	/// - When:
+	///   - `ServerEvent.responseDone` received where:
+	///     - `type` is `response.done`
+	///     - `response.status` is `"completed"`
+	///     - `response.output` array exists
+	///       and contains objects with `"mcp_call"` value for the object's `type` property.
+	/// - Then:
+	///   - For each object in `response.output` array
+	///     where object's `type` is `"mcp_call"`
+	///     (not `"message"` like in final composed output):
+	///     - Function call item id can be read from `id` (`response.output[].id`)
+	///   	- Called MCP function name can be taken from `name` (`response.output[].name`)
+	///   	- `arguments` should be taken from object's `arguments` property (JSON String)
+	///   	  and validated according to the function name being called.
+	///   	- ``Item/MCPCallStep`` should become `.call(.completed)` in case of successful
+	///   	  validation, or `.call(.incomplete)` in case validation fails.
+	///
+	/// # Rule 6
+	/// - When:
+	///   - `ServerEvent.responseMCPCallInProgress` received where:
+	///     - `type` is `response.mcp_call.in_progress`
+	/// - Then:
+	///   - Function call item id can be read from `itemId`
+	///   - This item id can be then used to get the stored function name
+	///   - ``Item/MCPCallStep`` should become `.call(.inProgress)`
+	///
+	/// # Rule 7
+	/// - When:
+	///   - `ServerEvent.responseMCPCallCompleted` received where:
+	///     - `type` is `response.mcp_call.completed`
+	/// - Then:
+	///   - Function call item id can be read from `itemId`
+	///   - This item id can be then used to get the stored function name
+	///   - ``Item/MCPCallStep`` should stay `.response(.inProgress)` (or just stay unchanged)
+	///     because usually there's no other information in such server event and we should
+	///     wait for the event described in Rule 8.
+	///
+	/// # Rule 8
+	/// - When:
+	///   - `ServerEvent.conversationItemDone` received where:
+	///     - `type` is `conversation.item.done`
+	///     - `item.type` is `"mcp_call"`
+	/// - Then:
+	///   - Function call item id can be read from `item.id`
+	///   - Function call name can be read from `item.name`
+	///   - Function call arguments can be read from `item.arguments` (JSON string)
+	///     and probably should be logged or even stored (if needed).
+	///   - ``Item/MCPCallStep`` should become `.response(.completed)`
+	///
+	/// # Rule 9
+	/// - When:
+	///   - `ServerEvent.responseOutputItemDone` received where:
+	///     - `type` is `response.output_item.done`
+	///     - `item.type` is `"mcp_call"`
+	/// - Then:
+	///   - Function call item id can be read from `item.id`
+	///   - Function call name can be read from `item.name`
+	///   - Function call arguments can be read from `item.arguments` (JSON string)
+	///   - Function call output can be read from `item.output` (JSON string)
+	///     and probably should be logged or even stored (if needed).
+	///   - ``Item/MCPCallStep`` should become `.response(.completed)`
+	@IsCase @CaseName @CaseValue
+	public enum MCPCallStep: Hashable, Codable, Sendable {
+		case added
+		case call(_ state: Item.Status)
+		case response(_ state: Item.Status)
+		
+		
+		/// Equals to `.call(.completed)`:
+		/// ``call(_:)`` with ``Item/Status/completed`` value.
+		public static let awaitingForResponse: Self = .call(.completed)
+		
+		/// Whether it was successful or not
+		public var isCallFinished: Bool {
+			self.callstate?.isAmong(.completed, .incomplete) == true
+		}
+		
+		/// Whether it was successful or not
+		public var isResponseFinished: Bool {
+			self.responsestate?.isAmong(.completed, .incomplete) == true
+		}
+		
+		/// Both ``call(_:)`` and ``response(_:)`` have completed
+		public var isComplete: Bool {
+			self == .response(.completed)
+		}
+		
+		/// Either ``call(_:)`` or ``response(_:)`` have failed
+		public var isIncomplete: Bool {
+				self == .call(.incomplete)
+			|| 	self == .response(.incomplete)
+		}
+		
+		public var isInProgress: Bool {
+			switch self {
+			case .added: true
+			case .call(let state):
+				/// In progress until the call fails;
+				/// completed call still awaits response
+				state != .incomplete
+			case .response(let state):
+				/// Only in-progress while the response is streaming
+				state == .inProgress
+			}
+		}
+		
+		public var status: Item.Status? {
+			switch self {
+			case .added: 				nil
+			case .call(let status): 	status
+			case .response(let status): status
+			}
+		}
+	}
+}
+
+// MARK: +⃣ Item MCP Call Step
+
+extension Item.MCPCallStep: CaseIterable {
+	public static var allCases: [Item.MCPCallStep] {
+		[
+			.added,
+			.call(.inProgress),
+			.call(.incomplete),
+			.call(.completed),
+			.response(.inProgress),
+			.response(.incomplete),
+			.response(.completed),
+		]
+	}
+}
+
+// MARK: :⃣ Comparable
+
+extension Item.MCPCallStep: Comparable {
+    /// Orders statuses by their declaration order in `CaseIterable`: `added` ← `call(.inProgress)` ← `call(.incomplete)` ← `call(.completed)` ← `response(.inProgress)` ← `response(.incomplete)` ← `response(.completed)`
+    public static func < (lhs: Self, rhs: Self) -> Bool {
+		(Self.allCases.firstIndex(of: lhs) ?? 0) < (Self.allCases.firstIndex(of: rhs) ?? 0)
+    }
 }
 
 // MARK: Helpers
