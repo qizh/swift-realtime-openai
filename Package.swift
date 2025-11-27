@@ -16,7 +16,7 @@ let package = Package(
 	],
 	dependencies: [
 		.package(url: "https://github.com/livekit/webrtc-xcframework.git", from: "137.7151.0"),
-		.package(url: "https://github.com/SwiftyLab/MetaCodable.git", from: "1.0.0"),
+		.package(url: "https://github.com/SwiftyLab/MetaCodable.git", branch: "dependabot/swift/github.com/swiftlang/swift-syntax-602.0.0"),
 		.package(url: "https://github.com/qizh/QizhMacroKit.git", from: "1.1.13"),
 	],
 	targets: [
