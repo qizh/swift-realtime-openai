@@ -680,12 +680,12 @@ extension Item {
 		
 		/// Whether it was successful or not
 		public var isCallFinished: Bool {
-			self.callstate?.isAmong(.completed, .incomplete) == true
+			self.callState?.isAmong(.completed, .incomplete) == true
 		}
 		
 		/// Whether it was successful or not
 		public var isResponseFinished: Bool {
-			self.responsestate?.isAmong(.completed, .incomplete) == true
+			self.responseState?.isAmong(.completed, .incomplete) == true
 		}
 		
 		/// Both ``call(_:)`` and ``response(_:)`` have completed
