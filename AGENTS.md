@@ -24,3 +24,11 @@
 
 - Follow existing code conventions in the project.
 - Maintain backward compatibility when possible.
+
+## Task Documentation
+
+### Key Findings
+
+- Document all key findings during task completion to help with future tasks.
+- This includes understanding project structure, patterns, and common workflows.
+- Store findings in memory or appropriate documentation for quick reference.
