@@ -1189,7 +1189,7 @@ extension JSONSchema {
 			}
 
 		case .number:
-			if json.numberValue == nil, Double(json.stringValue ?? "") == nil {
+			if json.numberValue == nil, json.integerValue == nil, Double(json.stringValue ?? "") == nil {
 				throw JSONSchemaValidationError.typeMismatch(expected: "number", actual: json.caseName, path: path)
 			}
 
