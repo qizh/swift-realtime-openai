@@ -746,12 +746,13 @@ private extension Conversation {
 			}
 			
 			if case let .mcpCall(call) = item {
-				/// Preserve failure state if MCP call previously failed
+				/// Preserve failure state if MCP call previously failed;
+				/// also skip createResponse since responseMCPCallFailed already sent it
 				if mcpCallState[call.id] != .call(.incomplete) {
 					mcpCallState[call.id] = .response(.completed)
+					if debug { logger.debug("Sending `createResponse` after MCP output item done for id: \(call.id) with status: .completed") }
+					try send(event: .createResponse())
 				}
-				if debug { logger.debug("Sending `createResponse` after MCP output item done for id: \(call.id) with status: .completed") }
-				try send(event: .createResponse())
 			}
 		
 		// MARK: Truncated
