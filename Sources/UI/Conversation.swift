@@ -264,6 +264,14 @@ public final class Conversation: @unchecked Sendable {
 		errorStream.finish()
 	}
 	
+	// MARK: ┣ Disconnect
+
+	/// Disconnect the WebRTC connection and release audio resources.
+	/// Call this before creating a new Conversation to prevent mic capture conflicts.
+	public func disconnect() {
+		client.disconnect()
+	}
+	
 	// MARK: ┣ Connection
 	
 	/// Connect using a prepared URLRequest (WebRTC).
