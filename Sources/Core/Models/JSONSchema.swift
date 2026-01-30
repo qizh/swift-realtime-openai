@@ -1392,15 +1392,14 @@ extension JSONSchema {
 		}
 
 		/// validate props + unknowns
-		/// (by default, we prohibit if `additionalProperties == nil`)
+		/// (per JSON Schema spec, omitting additionalProperties defaults to true)
 		for (key, value) in dict {
 			if let propSchema = properties[key] {
 				try _validate(value, against: propSchema, path: path + "." + key)
 			} else if let add = additional {
 				try _validate(value, against: add, path: path + "." + key)
-			} else {
-				throw JSONSchemaValidationError.unknownProperty(name: key, path: path)
 			}
+			/// When additionalProperties is nil, allow unknown properties (JSON Schema default)
 		}
 	}
 }

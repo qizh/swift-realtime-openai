@@ -574,7 +574,12 @@ private extension Conversation {
 		case let .conversationItemCreated(_, item, _):
 			entries.append(item)
 		case let .conversationItemAdded(_, item, _):
-			entries.append(item)
+			/// Replace placeholder if one exists, otherwise append
+			if let index = entries.firstIndex(where: { $0.id == item.id }) {
+				entries[index] = item
+			} else {
+				entries.append(item)
+			}
 			if case let .mcpCall(call) = item {
 				mcpCallState[call.id] = .added
 			}
