@@ -596,9 +596,12 @@ private extension Conversation {
 				mcpListToolsLastEventId[item.id] = event.id
 			}
 			if case let .mcpCall(call) = item {
-				/// Preserve failure state if MCP call previously failed
+				/// Preserve failure state if MCP call previously failed;
+				/// also skip createResponse since responseMCPCallFailed already sent it
 				if mcpCallState[call.id] != .call(.incomplete) {
 					mcpCallState[call.id] = .response(.completed)
+					if debug { logger.debug("Sending `createResponse` after MCP item done for id: \(call.id) with status: .completed") }
+					try send(event: .createResponse())
 				}
 			}
 		case let .conversationItemDeleted(_, itemId):
