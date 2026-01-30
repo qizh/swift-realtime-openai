@@ -772,7 +772,10 @@ private extension Conversation {
 			recordMcpListToolsProgress(itemId: itemId, eventId: eventId, status: .incomplete)
 		
 		case let .responseMCPCallInProgress(eventId, itemId, _):
-			mcpCallState[itemId] = .call(.inProgress)
+			/// Preserve .call(.completed) if arguments were already finalized
+			if mcpCallState[itemId] != .call(.completed) {
+				mcpCallState[itemId] = .call(.inProgress)
+			}
 			mcpResponseLastEventId[itemId] = eventId
 		case let .responseMCPCallFailed(eventId, itemId, _):
 			mcpCallState[itemId] = .call(.incomplete)
