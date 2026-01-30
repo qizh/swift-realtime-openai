@@ -136,6 +136,10 @@ private final class AudioTrackHolder: @unchecked Sendable {
 	}
 
 	public func disconnect() {
+		/// Disable the local audio track before closing the connection.
+		/// This releases the microphone resources and prevents conflicts
+		/// with new audio tracks created by subsequent WebRTCConnector instances.
+		audioTrack.isEnabled = false
 		connection.close()
 		stream.finish()
 	}
@@ -179,7 +183,9 @@ private extension WebRTCConnector {
 			optionalConstraints: nil
 		))
 
-		return tap(factory.audioTrack(with: audioSource, trackId: "local_audio")) { audioTrack in
+			/// Use a unique track ID to avoid conflicts with tracks from previous connections.
+		let trackId = "local_audio_\(UUID().uuidString.prefix(8))"
+		return tap(factory.audioTrack(with: audioSource, trackId: trackId)) { audioTrack in
 			connection.add(audioTrack, streamIds: ["local_stream"])
 		}
 	}
