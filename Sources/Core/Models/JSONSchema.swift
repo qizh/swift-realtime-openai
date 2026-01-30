@@ -163,7 +163,8 @@ public indirect enum JSONSchema: Sendable {
 	)
 	
 	// MARK: ┣ number
-	/// A schema describing a numeric (floating-point) value with optional numeric constraints.
+	/// A schema describing a numeric (floating-point) value
+    /// with optional numeric constraints.
 	/// - Parameters:
 	///   - multipleOf: Value must be a multiple of this integer.
 	///   - minimum: Inclusive minimum value.
@@ -259,7 +260,17 @@ extension JSONSchema {
             return "null"
         case let .boolean(d):
             return "boolean(\(d ?? "null"))"
-        case let .integer(multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, description, title, defaultValue, examples):
+        case let .integer(
+            multipleOf,
+            minimum,
+            exclusiveMinimum,
+            maximum,
+            exclusiveMaximum,
+            description,
+            title,
+            defaultValue,
+            examples
+        ):
             let rendered = renderParts([
                 "multipleOf": multipleOf?.formatted(.number),
                 "minimum": minimum?.formatted(.number),
@@ -272,7 +283,17 @@ extension JSONSchema {
                 "examples": examples?.map { $0.formatted(.number) }.joined(separator: ", "),
             ])
             return rendered.isEmpty ? "integer" : "{\(rendered)}"
-        case let .number(multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, description, title, defaultValue, examples):
+        case let .number(
+            multipleOf,
+            minimum,
+            exclusiveMinimum,
+            maximum,
+            exclusiveMaximum,
+            description,
+            title,
+            defaultValue,
+            examples
+        ):
             let rendered = renderParts([
                 "multipleOf": multipleOf?.formatted(.number),
                 "minimum": minimum?.formatted(.number),
@@ -285,7 +306,14 @@ extension JSONSchema {
                 "examples": examples?.map { $0.formatted(.number) }.joined(separator: ", "),
             ])
             return rendered.isEmpty ? "number" : "{\(rendered)}"
-        case let .string(pattern, format, description, title, defaultValue, examples):
+        case let .string(
+            pattern,
+            format,
+            description,
+            title,
+            defaultValue,
+            examples
+        ):
             let rendered = renderParts([
                 "pattern": pattern,
                 "format": format?.rawValue,
@@ -295,7 +323,15 @@ extension JSONSchema {
                 "examples": examples?.joined(separator: ", "),
             ])
             return rendered.isEmpty ? "string" : "{\(rendered)}"
-        case let .array(of, minItems, maxItems, description, title, defaultValue, examples):
+        case let .array(
+            of,
+            minItems,
+            maxItems,
+            description,
+            title,
+            defaultValue,
+            examples
+        ):
             let defaultRendered: String? = defaultValue.map { values in
                 let inner = values.map { render($0) }.joined(separator: ", ")
                 return "[\(inner)]"
@@ -316,7 +352,15 @@ extension JSONSchema {
             ])
             let head = "[\(of.humanReadableString)]"
             return rendered.isEmpty ? head : "\(head) {\(rendered)}"
-        case let .object(properties, required, additionalProperties, description, title, defaultValue, examples):
+        case let .object(
+            properties,
+            required,
+            additionalProperties,
+            description,
+            title,
+            defaultValue,
+            examples
+        ):
             let propsRendered: String = {
                 let pairs = properties
                     .map { key, value in "\(key): \(value.humanReadableString)" }
@@ -491,23 +535,23 @@ extension JSONSchema {
 	/// Well-known formats for string schemas, following common JSON Schema conventions.
 	@IsCase
 	public enum StringFormat: String, Codable, Hashable, Sendable, CaseIterable {
-		/// IPv4 address (e.g., 192.168.0.1)
+		/// `IPv4` address (e.g., `192.168.0.1`)
 		case ipv4
-		/// IPv6 address (e.g., ::1)
+		/// `IPv6` address (e.g., `::1`)
 		case ipv6
 		/// Universally unique identifier
 		case uuid
-		/// Calendar date in RFC 3339 full-date format
+		/// Calendar date in `RFC 3339` full-date format
 		case date
-		/// Time of day in RFC 3339 full-time format
+		/// Time of day in `RFC 3339` full-time format
 		case time
 		/// Email address
 		case email
-		/// Duration in ISO 8601 format
+		/// Duration in `ISO 8601` format
 		case duration
-		/// DNS hostname
+		/// `DNS` hostname
 		case hostname
-		/// Date and time in RFC 3339 date-time format
+		/// Date and time in `RFC 3339` date-time format
 		case dateTime = "date-time"
 	}
 }
@@ -520,61 +564,85 @@ extension JSONSchema: Equatable {
 	public static func == (lhs: JSONSchema, rhs: JSONSchema) -> Bool {
 		switch (lhs, rhs) {
 		case let (.null(d1),
-				  .null(d2)): 		  d1 == d2
+				  .null(d2)):
+            
+            d1 == d2
+            
 		case let (.boolean(d1),
-				  .boolean(d2)): 	  d1 == d2
+				  .boolean(d2)):
+            
+            d1 == d2
+            
 		case let (.anyOf(c1, d1),
-				  .anyOf(c2, d2)): 	  d1 == d2 && c1 == c2
+				  .anyOf(c2, d2)):
+            
+                d1 == d2
+            &&  c1 == c2
+            
 		case let (.enum(cases1, d1),
-				  .enum(cases2, d2)): d1 == d2 && cases1 == cases2
+				  .enum(cases2, d2)):
+            
+                d1 == d2
+            &&  cases1 == cases2
+            
 		case let (.object(p1, r1, a1, d1, t1, def1, ex1),
 				  .object(p2, r2, a2, d2, t2, def2, ex2)):
-			d1 == d2
-			&& t1 == t2
-			&& def1 == def2
-			&& ex1 == ex2
-			&& p1 == p2
-			&& r1 == r2
-			&& a1 == a2
+            
+                d1 == d2
+			&&  t1 == t2
+			&&  def1 == def2
+			&&  ex1 == ex2
+			&&  p1 == p2
+			&&  r1 == r2
+			&&  a1 == a2
+            
 		case let (.string(pat1, fmt1, d1, t1, def1, ex1),
 				  .string(pat2, fmt2, d2, t2, def2, ex2)):
-			pat1 == pat2
-			&& fmt1 == fmt2
-			&& d1 == d2
-			&& t1 == t2
-			&& def1 == def2
-			&& ex1 == ex2
+            
+                pat1 == pat2
+			&&  fmt1 == fmt2
+			&&  d1 == d2
+			&&  t1 == t2
+			&&  def1 == def2
+			&&  ex1 == ex2
+            
 		case let (.array(of1, min1, max1, d1, t1, def1, ex1),
 				  .array(of2, min2, max2, d2, t2, def2, ex2)):
-			of1 == of2
-			&& min1 == min2
-			&& max1 == max2
-			&& d1 == d2
-			&& t1 == t2
-			&& def1 == def2
-			&& ex1 == ex2
+            
+                of1 == of2
+			&&  min1 == min2
+			&&  max1 == max2
+			&&  d1 == d2
+			&&  t1 == t2
+			&&  def1 == def2
+			&&  ex1 == ex2
+            
 		case let (.number(m1, min1, exMin1, max1, exMax1, d1, t1, def1, ex1),
 				  .number(m2, min2, exMin2, max2, exMax2, d2, t2, def2, ex2)):
-			m1 == m2
-			&& min1 == min2
-			&& exMin1 == exMin2
-			&& max1 == max2
-			&& exMax1 == exMax2
-			&& d1 == d2
-			&& t1 == t2
-			&& def1 == def2
-			&& ex1 == ex2
+            
+                m1 == m2
+			&&  min1 == min2
+			&&  exMin1 == exMin2
+			&&  max1 == max2
+			&&  exMax1 == exMax2
+			&&  d1 == d2
+			&&  t1 == t2
+			&&  def1 == def2
+			&&  ex1 == ex2
+            
 		case let (.integer(m1, min1, exMin1, max1, exMax1, d1, t1, def1, ex1),
 				  .integer(m2, min2, exMin2, max2, exMax2, d2, t2, def2, ex2)):
-			m1 == m2
-			&& min1 == min2
-			&& exMin1 == exMin2
-			&& max1 == max2
-			&& exMax1 == exMax2
-			&& d1 == d2
-			&& t1 == t2
-			&& def1 == def2
-			&& ex1 == ex2
+            
+                m1 == m2
+			&&  min1 == min2
+			&&  exMin1 == exMin2
+			&&  max1 == max2
+			&&  exMax1 == exMax2
+			&&  d1 == d2
+			&&  t1 == t2
+			&&  def1 == def2
+			&&  ex1 == ex2
+            
 		default: false
 		}
 	}
@@ -662,125 +730,129 @@ extension JSONSchema: Codable {
 	/// Encodes this schema into its JSON Schema representation.
 	public func encode(to encoder: any Encoder) throws {
 		var container = encoder.container(keyedBy: CodingKeys.self)
+        
 		switch self {
 		case let .null(description):
+            
 			try container.encode("null", forKey: .type)
 			if let d = description { try container.encode(d, forKey: .description) }
 			
 		case let .boolean(description):
+            
 			try container.encode("boolean", forKey: .type)
 			if let d = description { try container.encode(d, forKey: .description) }
 			
-		case let .anyOf(
-			cases,
-			description
-		):
+		case let .anyOf(cases, description):
+            
 			try container.encode(cases, forKey: .anyOf)
 			if let d = description { try container.encode(d, forKey: .description) }
 			
-		case let .enum(
-			cases,
-			description
-		):
+		case let .enum(cases, description):
+            
 			try container.encode("string", forKey: .type)
 			try container.encode(cases, forKey: .enum)
+            
 			if let d = description { try container.encode(d, forKey: .description) }
 			
 		case let .object(
 			properties,
 			required,
-			additionalProperties,
-			description,
+			addProps,   /// Additional Properties
+			descriptn,  /// Description
 			title,
-			defaultValue,
+			defValue,   /// Default Value
 			examples
 		):
 			try container.encode("object", forKey: .type)
 			try container.encode(properties, forKey: .properties)
+            
 			if let req = required { try container.encode(req, forKey: .required) }
-			if let add = additionalProperties { try container.encode(add, forKey: .additionalProperties) }
-			if let d = description { try container.encode(d, forKey: .description) }
-			if let t = title { try container.encode(t, forKey: .title) }
-			if let dv = defaultValue { try container.encode(dv, forKey: .default) }
-			if let ex = examples { try container.encode(ex, forKey: .examples) }
+			if let add = addProps { try container.encode(add, forKey: .additionalProperties) }
+			if let d = descriptn  { try container.encode(d, forKey: .description) }
+			if let t = title      { try container.encode(t, forKey: .title) }
+			if let dv = defValue  { try container.encode(dv, forKey: .default) }
+			if let ex = examples  { try container.encode(ex, forKey: .examples) }
 			
 		case let .string(
 			pattern,
 			format,
-			description,
+			descriptn,  /// Description
 			title,
-			defaultValue,
+            defValue,   /// Default Value
 			examples
 		):
 			try container.encode("string", forKey: .type)
-			if let p = pattern { try container.encode(p, forKey: .pattern) }
-			if let f = format { try container.encode(f.rawValue, forKey: .format) }
-			if let d = description { try container.encode(d, forKey: .description) }
-			if let t = title { try container.encode(t, forKey: .title) }
-			if let dv = defaultValue { try container.encode(dv, forKey: .default) }
+            
+			if let p = pattern   { try container.encode(p, forKey: .pattern) }
+			if let f = format    { try container.encode(f.rawValue, forKey: .format) }
+			if let d = descriptn { try container.encode(d, forKey: .description) }
+			if let t = title     { try container.encode(t, forKey: .title) }
+			if let dv = defValue { try container.encode(dv, forKey: .default) }
 			if let ex = examples { try container.encode(ex, forKey: .examples) }
 			
 		case let .array(
 			of,
 			minItems,
 			maxItems,
-			description,
+			descriptn,
 			title,
-			defaultValue,
+            defValue,   /// Default Value
 			examples
 		):
 			try container.encode("array", forKey: .type)
 			try container.encode(of, forKey: .items)
+            
 			if let mi = minItems { try container.encode(mi, forKey: .minItems) }
 			if let ma = maxItems { try container.encode(ma, forKey: .maxItems) }
-			if let d = description { try container.encode(d, forKey: .description) }
-			if let t = title { try container.encode(t, forKey: .title) }
-			if let dv = defaultValue { try container.encode(dv, forKey: .default) }
+			if let d = descriptn { try container.encode(d, forKey: .description) }
+			if let t = title     { try container.encode(t, forKey: .title) }
+			if let dv = defValue { try container.encode(dv, forKey: .default) }
 			if let ex = examples { try container.encode(ex, forKey: .examples) }
 			
 		case let .number(
 			multipleOf,
 			minimum,
-			exclusiveMinimum,
+			exclMin,    /// Exclusive Minimum
 			maximum,
-			exclusiveMaximum,
+			exclMax,    /// Exclusive Maximum
 			description,
 			title,
-			defaultValue,
+            defValue,   /// Default Value
 			examples
 		):
 			try container.encode("number", forKey: .type)
-			if let m = multipleOf { try container.encode(m, forKey: .multipleOf) }
-			if let min = minimum { try container.encode(min, forKey: .minimum) }
-			if let exMin = exclusiveMinimum { try container.encode(exMin, forKey: .exclusiveMinimum) }
-			if let max = maximum { try container.encode(max, forKey: .maximum) }
-			if let exMax = exclusiveMaximum { try container.encode(exMax, forKey: .exclusiveMaximum) }
+            
+			if let m = multipleOf  { try container.encode(m, forKey: .multipleOf) }
+			if let min = minimum   { try container.encode(min, forKey: .minimum) }
+			if let exMin = exclMin { try container.encode(exMin, forKey: .exclusiveMinimum) }
+			if let max = maximum   { try container.encode(max, forKey: .maximum) }
+			if let exMax = exclMax { try container.encode(exMax, forKey: .exclusiveMaximum) }
 			if let d = description { try container.encode(d, forKey: .description) }
-			if let t = title { try container.encode(t, forKey: .title) }
-			if let dv = defaultValue { try container.encode(dv, forKey: .default) }
-			if let ex = examples { try container.encode(ex, forKey: .examples) }
+			if let t = title       { try container.encode(t, forKey: .title) }
+			if let dv = defValue   { try container.encode(dv, forKey: .default) }
+			if let ex = examples   { try container.encode(ex, forKey: .examples) }
 			
 		case let .integer(
 			multipleOf,
 			minimum,
-			exclusiveMinimum,
+            exclMin,    /// Exclusive Minimum
 			maximum,
-			exclusiveMaximum,
+            exclMax,    /// Exclusive Maximum
 			description,
 			title,
-			defaultValue,
+            defValue,   /// Default Value
 			examples
 		):
 			try container.encode("integer", forKey: .type)
-			if let m = multipleOf { try container.encode(m, forKey: .multipleOf) }
-			if let min = minimum { try container.encode(min, forKey: .minimum) }
-			if let exMin = exclusiveMinimum { try container.encode(exMin, forKey: .exclusiveMinimum) }
-			if let max = maximum { try container.encode(max, forKey: .maximum) }
-			if let exMax = exclusiveMaximum { try container.encode(exMax, forKey: .exclusiveMaximum) }
+			if let m = multipleOf  { try container.encode(m, forKey: .multipleOf) }
+			if let min = minimum   { try container.encode(min, forKey: .minimum) }
+			if let exMin = exclMin { try container.encode(exMin, forKey: .exclusiveMinimum) }
+			if let max = maximum   { try container.encode(max, forKey: .maximum) }
+			if let exMax = exclMax { try container.encode(exMax, forKey: .exclusiveMaximum) }
 			if let d = description { try container.encode(d, forKey: .description) }
-			if let t = title { try container.encode(t, forKey: .title) }
-			if let dv = defaultValue { try container.encode(dv, forKey: .default) }
-			if let ex = examples { try container.encode(ex, forKey: .examples) }
+			if let t = title       { try container.encode(t, forKey: .title) }
+			if let dv = defValue   { try container.encode(dv, forKey: .default) }
+			if let ex = examples   { try container.encode(ex, forKey: .examples) }
 		}
 	}
 	
@@ -788,11 +860,11 @@ extension JSONSchema: Codable {
 	
 	/// Initializes a schema from its JSON Schema representation.
 	public init(from decoder: any Decoder) throws {
-		let container = try decoder.container(keyedBy: CodingKeys.self)
-		let description = try container.decodeIfPresent(String.self, forKey: .description)
-		let title = try container.decodeIfPresent(String.self, forKey: .title)
+		let container    = try decoder.container(keyedBy: CodingKeys.self)
+		let description  = try container.decodeIfPresent(String.self, forKey: .description)
+		let title        = try container.decodeIfPresent(String.self, forKey: .title)
 		let defaultValue = try container.decodeIfPresent(JSONValue.self, forKey: .default)
-		let examples = try container.decodeIfPresent([JSONValue].self, forKey: .examples)
+		let examples     = try container.decodeIfPresent([JSONValue].self, forKey: .examples)
 		
 		/// anyOf has precedence
 		if let anyOfArray = try container.decodeIfPresent([JSONSchema].self, forKey: .anyOf) {
@@ -820,10 +892,11 @@ extension JSONSchema: Codable {
 			)
 		case "string":
 			let pattern = try container.decodeIfPresent(String.self, forKey: .pattern)
-			let fmtRaw = try container.decodeIfPresent(String.self, forKey: .format)
-			let fmt = fmtRaw.flatMap { StringFormat(rawValue: $0) }
-			let defStr = try container.decodeIfPresent(String.self, forKey: .default)
-			let ex = try container.decodeIfPresent([String].self, forKey: .examples)
+			let fmtRaw  = try container.decodeIfPresent(String.self, forKey: .format)
+            let defStr  = try container.decodeIfPresent(String.self, forKey: .default)
+            let ex      = try container.decodeIfPresent([String].self, forKey: .examples)
+            let fmt = fmtRaw.flatMap { StringFormat(rawValue: $0) }
+            
 			self = .string(
 				pattern: pattern,
 				format: fmt,
@@ -833,13 +906,15 @@ extension JSONSchema: Codable {
 				examples: ex
 			)
 		case "array":
-			let items = try container.decode(JSONSchema.self, forKey: .items)
+			let items    = try container.decode(JSONSchema.self, forKey: .items)
 			let minItems = try container.decodeIfPresent(Int.self, forKey: .minItems)
 							?? container.decodeIfPresent(Int.self, forKey: .minimum)
 			let maxItems = try container.decodeIfPresent(Int.self, forKey: .maxItems)
 							?? container.decodeIfPresent(Int.self, forKey: .maximum)
+            
 			let dv = defaultValue.map { [$0] }
 			let exNested = examples?.compactMap { [JSONValue.array([$0])] }
+            
 			self = .array(
 				of: items,
 				minItems: minItems,
@@ -851,12 +926,13 @@ extension JSONSchema: Codable {
 			)
 		case "number":
 			let multipleOf = try container.decodeIfPresent(Int.self, forKey: .multipleOf)
-			let minimum = try container.decodeIfPresent(Int.self, forKey: .minimum)
-			let exMin = try container.decodeIfPresent(Int.self, forKey: .exclusiveMinimum)
-			let maximum = try container.decodeIfPresent(Int.self, forKey: .maximum)
-			let exMax = try container.decodeIfPresent(Int.self, forKey: .exclusiveMaximum)
-			let dv = try container.decodeIfPresent(Double.self, forKey: .default)
-			let ex = try container.decodeIfPresent([Double].self, forKey: .examples)
+			let minimum    = try container.decodeIfPresent(Int.self, forKey: .minimum)
+			let exMin      = try container.decodeIfPresent(Int.self, forKey: .exclusiveMinimum)
+			let maximum    = try container.decodeIfPresent(Int.self, forKey: .maximum)
+			let exMax      = try container.decodeIfPresent(Int.self, forKey: .exclusiveMaximum)
+			let dv         = try container.decodeIfPresent(Double.self, forKey: .default)
+			let ex         = try container.decodeIfPresent([Double].self, forKey: .examples)
+            
 			self = .number(
 				multipleOf: multipleOf,
 				minimum: minimum,
@@ -870,12 +946,13 @@ extension JSONSchema: Codable {
 			)
 		case "integer":
 			let multipleOf = try container.decodeIfPresent(Int.self, forKey: .multipleOf)
-			let minimum = try container.decodeIfPresent(Int.self, forKey: .minimum)
-			let exMin = try container.decodeIfPresent(Int.self, forKey: .exclusiveMinimum)
-			let maximum = try container.decodeIfPresent(Int.self, forKey: .maximum)
-			let exMax = try container.decodeIfPresent(Int.self, forKey: .exclusiveMaximum)
-			let dv = try container.decodeIfPresent(Int.self, forKey: .default)
-			let ex = try container.decodeIfPresent([Int].self, forKey: .examples)
+			let minimum    = try container.decodeIfPresent(Int.self, forKey: .minimum)
+			let exMin      = try container.decodeIfPresent(Int.self, forKey: .exclusiveMinimum)
+			let maximum    = try container.decodeIfPresent(Int.self, forKey: .maximum)
+			let exMax      = try container.decodeIfPresent(Int.self, forKey: .exclusiveMaximum)
+			let dv         = try container.decodeIfPresent(Int.self, forKey: .default)
+			let ex         = try container.decodeIfPresent([Int].self, forKey: .examples)
+            
 			self = .integer(
 				multipleOf: multipleOf,
 				minimum: minimum,
@@ -926,20 +1003,26 @@ extension JSONValue: ExpressibleByArrayLiteral,
 					 ExpressibleByIntegerLiteral,
 					 ExpressibleByBooleanLiteral,
 					 ExpressibleByNilLiteral {
-	/// Creates a ``JSONValue`` from a string literal.
+	
+    /// Creates a ``JSONValue`` from a string literal.
 	/// - Parameter value: The `String` to wrap.
 	public init(stringLiteral value: String) { self = .string(value) }
-	/// Creates a ``JSONValue`` from a floating-point literal.
+	
+    /// Creates a ``JSONValue`` from a floating-point literal.
 	/// - Parameter value: The double value to wrap.
 	public init(floatLiteral value: Double) { self = .number(value) }
-	/// Creates a ``JSONValue`` from an integer literal.
+	
+    /// Creates a ``JSONValue`` from an integer literal.
 	/// - Parameter value: The integer value to wrap.
 	public init(integerLiteral value: Int) { self = .integer(value) }
-	/// Creates a ``JSONValue`` from a boolean literal.
+	
+    /// Creates a ``JSONValue`` from a boolean literal.
 	/// - Parameter value: The boolean value to wrap.
 	public init(booleanLiteral value: Bool) { self = .boolean(value) }
-	/// Creates a ``JSONValue`` representing ``JSONValue/null`` from a `nil` literal.
+	
+    /// Creates a ``JSONValue`` representing ``JSONValue/null`` from a `nil` literal.
 	public init(nilLiteral: ()) { self = .null }
+    
 	/// Creates a ``JSONValue``.``JSONValue/array(_:)``
 	/// from an array literal of ``JSONValue`` elements.
 	/// - Parameter elements: The ``JSONValue`` elements in the array.
@@ -1016,11 +1099,12 @@ extension JSONValue: CustomStringConvertible {
 				case "\n": out.append("\\n")
 				case "\r": out.append("\\r")
 				case "\t": out.append("\\t")
-				default: out.append(ch)
+				default:   out.append(ch)
 				}
 			}
 			return out
 		}
+        
 		switch self {
 		case .null:
 			return "null"
@@ -1137,7 +1221,11 @@ extension JSONSchema {
 	}
 
 	/// Recursive worker
-	fileprivate static func _validate(_ json: JSONValue, against schema: JSONSchema, path: String) throws {
+    fileprivate static func _validate(
+        _ json: JSONValue,
+        against schema: JSONSchema,
+        path: String
+    ) throws {
 		switch schema {
 		case let .object(properties, required, additionalProperties, _, _, _, _):
 			try validateObject(
@@ -1150,13 +1238,25 @@ extension JSONSchema {
 
 		case let .array(of: itemSchema, minItems, maxItems, _, _, _, _):
 			guard let arr = json.arrayValue else {
-				throw JSONSchemaValidationError.typeMismatch(expected: "array", actual: json.caseName, path: path)
+                throw JSONSchemaValidationError.typeMismatch(
+                    expected: "array",
+                    actual: json.caseName,
+                    path: path
+                )
 			}
 			if let min = minItems, arr.count < min {
-				throw JSONSchemaValidationError.arrayTooShort(min: min, actual: arr.count, path: path)
+                throw JSONSchemaValidationError.arrayTooShort(
+                    min: min,
+                    actual: arr.count,
+                    path: path
+                )
 			}
 			if let max = maxItems, arr.count > max {
-				throw JSONSchemaValidationError.arrayTooLong(max: max, actual: arr.count, path: path)
+                throw JSONSchemaValidationError.arrayTooLong(
+                    max: max,
+                    actual: arr.count,
+                    path: path
+                )
 			}
 			for (idx, item) in arr.enumerated() {
 				try _validate(item, against: itemSchema, path: "\(path)[\(idx)]")
@@ -1164,13 +1264,24 @@ extension JSONSchema {
 
 		case let .string(pattern, format, _, _, _, _):
 			guard let s = json.stringValue else {
-				throw JSONSchemaValidationError.typeMismatch(expected: "string", actual: json.caseName, path: path)
+                throw JSONSchemaValidationError.typeMismatch(
+                    expected: "string",
+                    actual: json.caseName,
+                    path: path
+                )
 			}
 			if let pat = pattern, !pat.isEmpty {
 				if (try? NSRegularExpression(pattern: pat))?
-					.firstMatch(in: s, range: NSRange(location: 0, length: (s as NSString).length)) == nil
+                    .firstMatch(
+                        in: s,
+                        range: NSRange(location: 0, length: (s as NSString).length)
+                    ) == nil
 				{
-					throw JSONSchemaValidationError.typeMismatch(expected: "string(pattern: \(pat))", actual: "string(does not match)", path: path)
+                    throw JSONSchemaValidationError.typeMismatch(
+                        expected: "string(pattern: \(pat))",
+                        actual: "string(does not match)",
+                        path: path
+                    )
 				}
 			}
 			_ = format /// The format hint is not validated in the light version
@@ -1178,29 +1289,53 @@ extension JSONSchema {
 		case .integer:
 			if let n = json.numberValue {
 				if n.rounded(.towardZero) != n {
-					throw JSONSchemaValidationError.typeMismatch(expected: "integer", actual: "number(\(n))", path: path)
+                    throw JSONSchemaValidationError.typeMismatch(
+                        expected: "integer",
+                        actual: "number(\(n))",
+                        path: path
+                    )
 				}
 			} else if json.integerValue != nil {
 				/// OK
-			} else if let s = json.stringValue, let n = Double(s), n.rounded(.towardZero) == n {
+			} else if let s = json.stringValue,
+                      let n = Double(s),
+                      n.rounded(.towardZero) == n {
 				/// Allow a numerical string if it is an integer
 			} else {
-				throw JSONSchemaValidationError.typeMismatch(expected: "integer", actual: json.caseName, path: path)
+                throw JSONSchemaValidationError.typeMismatch(
+                    expected: "integer",
+                    actual: json.caseName,
+                    path: path
+                )
 			}
 
 		case .number:
-			if json.numberValue == nil, json.integerValue == nil, Double(json.stringValue ?? "") == nil {
-				throw JSONSchemaValidationError.typeMismatch(expected: "number", actual: json.caseName, path: path)
+			if json.numberValue == nil,
+               json.integerValue == nil,
+               Double(json.stringValue ?? "") == nil {
+                throw JSONSchemaValidationError.typeMismatch(
+                    expected: "number",
+                    actual: json.caseName,
+                    path: path
+                )
 			}
 
 		case .boolean:
 			guard json.boolValue != nil else {
-				throw JSONSchemaValidationError.typeMismatch(expected: "boolean", actual: json.caseName, path: path)
+                throw JSONSchemaValidationError.typeMismatch(
+                    expected: "boolean",
+                    actual: json.caseName,
+                    path: path
+                )
 			}
 
 		case .null:
 			guard json.isNull else {
-				throw JSONSchemaValidationError.typeMismatch(expected: "null", actual: json.caseName, path: path)
+                throw JSONSchemaValidationError.typeMismatch(
+                    expected: "null",
+                    actual: json.caseName,
+                    path: path
+                )
 			}
 
 		case let .anyOf(cases, _):
@@ -1215,10 +1350,18 @@ extension JSONSchema {
 
 		case let .enum(cases, _):
 			guard let s = json.stringValue else {
-				throw JSONSchemaValidationError.typeMismatch(expected: "string(enum)", actual: json.caseName, path: path)
+                throw JSONSchemaValidationError.typeMismatch(
+                    expected: "string(enum)",
+                    actual: json.caseName,
+                    path: path
+                )
 			}
 			if !cases.contains(s) {
-				throw JSONSchemaValidationError.stringEnumMismatch(allowed: cases, actual: s, path: path)
+                throw JSONSchemaValidationError.stringEnumMismatch(
+                    allowed: cases,
+                    actual: s,
+                    path: path
+                )
 			}
 		}
 	}
@@ -1231,13 +1374,20 @@ extension JSONSchema {
 		path: String
 	) throws {
 		guard let dict = json.dictionaryValue else {
-			throw JSONSchemaValidationError.typeMismatch(expected: "object", actual: json.caseName, path: path)
+            throw JSONSchemaValidationError.typeMismatch(
+                expected: "object",
+                actual: json.caseName,
+                path: path
+            )
 		}
 
 		/// required
 		if let required {
 			for key in required where dict[key] == nil {
-				throw JSONSchemaValidationError.missingRequiredProperty(name: key, path: path)
+                throw JSONSchemaValidationError.missingRequiredProperty(
+                    name: key,
+                    path: path
+                )
 			}
 		}
 
