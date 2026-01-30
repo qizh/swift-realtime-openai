@@ -75,9 +75,163 @@ public final class Conversation: @unchecked Sendable {
     /// Wall-clock tracking for model audio playback time
     private var modelAudioStartDate: Date?
     private var modelAudioAccumulatedMs: Int = 0
-
+	
+	// MARK: ┣ MCP related
+	
+	/// Tracks «MCP list-tools» and «MCP response» states independently of payload
+	/// (because item has no status fields).
+	
+	/// MCP list-tools states by Item ID
+	private var mcpListToolsProgress: [Item.ID: Item.Status] = [:]
+	private var mcpListToolsLastEventId: [Item.ID: String] = [:]
+	
+	/// MCP response states by Item ID replaced by MCP call states
+	public fileprivate(set) var mcpCallState: [Item.ID: Item.MCPCallStep] = [:]
+	private var mcpResponseLastEventId: [Item.ID: String] = [:]
+	
+	
+	/// Latest known status for the most recent conversation entry.
+	///
+	/// This property inspects the last item in ``entries`` (if any) and returns the most
+	/// up-to-date streaming status associated with that item:
+	/// - If the last entry has an MCP response status tracked, that status is returned.
+	/// - Otherwise, if it has an MCP list-tools status tracked, that status is returned.
+	/// - If no status information is known for the last entry, `nil` is returned.
+	///
+	/// - Note:
+	///   - Status is tracked externally from the item payload via streaming progress maps,
+	///   	so it can reflect in-progress/completed/failed states
+	///   	before the final item arrives.
+	///   - This does not mutate state and runs on the main actor,
+	///   	consistent with ``Conversation``.
+	///
+	/// - Returns:
+	///   `.inProgress`, `.completed`, `.incomplete`, or `nil` if no status is available.
+	///
+	/// - SeeAlso:
+	///   - ``mcpListToolsStatus(for:)`` for querying a specific MCP list-tools item by ID.
+	public var lastMcpEntryStatus: Item.Status? {
+		if let lastEntry = entries.last {
+			if let callStep = mcpCallState[lastEntry.id] {
+				/// Map MCPCallStep to status: .call(.completed) means "awaiting response"
+				/// which is still in-progress from the caller's perspective
+				if callStep.isInProgress {
+					.inProgress
+				} else if callStep.isIncomplete {
+					.incomplete
+				} else if callStep.isComplete {
+					.completed
+				} else {
+					nil
+				}
+			} else {
+				mcpListToolsProgress[lastEntry.id]
+			}
+		} else {
+			nil
+		}
+	}
+	
+	/// Returns whether a given MCP tool-call item has finished its "call preparation" phase.
+	///
+	/// This checks the tracked MCP call state for the provided item identifier and reports
+	/// true only when the state is `.call(.completed)`. Any other state (including missing
+	/// state, in-progress, incomplete, or response phases) returns false.
+	///
+	/// - Parameter itemId: The identifier of the MCP tool-call conversation item to query.
+	/// - Returns: `true` if the tool call is prepared (i.e., call phase is completed);
+	///     otherwise `false`.
+	/// - Note:
+	///   - This does not inspect the conversation entries directly; it relies on
+	///     the streaming progress tracked in `mcpCallState`.
+	///   - Use this to enable UI that depends on tool-call readiness before execution
+	///     or response handling.
+	/// - SeeAlso: ``isMcpToolCallInProgress`` for checking if any MCP tool-call
+	///   is currently running.
+	public func isMcpToolCallArgumentsPrepared(for itemId: String) -> Bool {
+		if let state = mcpCallState[itemId] {
+			switch state {
+			case .call(.completed): true
+			default: 				false
+			}
+		} else {
+			false
+		}
+	}
+	
+	/// Indicates whether any MCP tool-call is currently in progress.
+	///
+	/// This property inspects the internally tracked MCP call states for all
+	/// conversation items and returns true if at least one item is in an
+	/// in-progress phase. It does not require that the final item payload has
+	/// been received yet; it relies on streaming progress updates recorded in
+	/// `mcpCallState`.
+	///
+	/// - Returns:
+	///   - `true` when any `Item.MCPCallStep` reports `isInProgress == true`.
+	///   - `false` when no MCP tool-call is currently running or if no MCP
+	///     call state has been recorded.
+	///
+	/// - Use cases:
+	///   - Drive UI indicators (e.g., spinners or disabled buttons) while the
+	///     model prepares or executes an MCP tool call.
+	///   - Gate user interactions that should only proceed once MCP execution
+	///     has completed.
+	///
+	/// - Threading:
+	///   - `Conversation` is `@MainActor`; read this property on the main thread.
+	///
+	/// - SeeAlso:
+	///   - ``isMcpToolCallPrepared(for:)`` to check whether a specific MCP tool-call
+	///     has completed its preparation phase.
+	///   - ``lastMcpEntryStatus`` for the latest known status of the most recent entry.
+	public var isMcpToolCallInProgress: Bool {
+		mcpCallState.values.contains(where: \.isInProgress)
+	}
+	
+	public var isGettingMcpToolsList: Bool {
+		mcpListToolsProgress.values.contains(.inProgress)
+	}
+	
+	/// It wasn’t really necessary to be publicly or internally available.
+	/*
+	/// Latest known status for an MCP list-tools item.
+	/// - Returns: `.inProgress`, `.completed`, `.incomplete`,
+	/// 	or `nil` if we don't know anything about this item yet.
+	/// - Parameter itemId: The identifier of the MCP list-tools conversation item
+	/// 	whose status to query.
+	public func mcpListToolsStatus(for itemId: String) -> Item.Status? {
+		if let status = mcpListToolsProgress[itemId] {
+			/// 1. If progress on streaming events is already recorded, it will be returned
+			status
+		} else if entries.contains(
+			where: { entry in
+				if case let .mcpListTools(list) = entry {
+					list.id == itemId
+				} else {
+					false
+				}
+			}
+		) {
+			/// 2. If the final item is already in the entries, we consider it complete
+			.completed
+		} else {
+			/// 3. Otherwise, we don't know anything
+			nil
+		}
+	}
+	
+	/// Last seen server event id for this MCP list-tools item (if any).
+	public func mcpListToolsLastEventId(for itemId: String) -> String? {
+		mcpListToolsLastEventId[itemId]
+	}
+	*/
+	
+	// MARK: ┣ Messages
+	
 	/// A list of messages in the conversation.
-	/// Note that this doesn't include function call events. To get a complete list, use `entries`.
+	/// Note that this doesn't include function call events.
+	/// To get a complete list, use ``entries``.
 	public var messages: [Item.Message] {
 		entries.compactMap { switch $0 {
 			case let .message(message): return message
@@ -121,6 +275,14 @@ public final class Conversation: @unchecked Sendable {
 	deinit {
 		client.disconnect()
 		errorStream.finish()
+	}
+	
+	// MARK: ┣ Disconnect
+
+	/// Disconnect the WebRTC connection and release audio resources.
+	/// Call this before creating a new Conversation to prevent mic capture conflicts.
+	public func disconnect() {
+		client.disconnect()
 	}
 	
 	// MARK: ┣ Connection
@@ -380,31 +542,113 @@ public final class Conversation: @unchecked Sendable {
 
 /// Event handling private API
 private extension Conversation {
+	/// Records progress for an MCP list-tools item and ensures a placeholder Item exists.
+	///
+	/// - Note: If the Item is not present yet, it will create a placeholder `.mcpListTools`
+	/// 	entry so that UI can reference it before the final `conversation.item.done`
+	/// 	arrives.
+	///
+	/// - Parameters:
+	///   - itemId: The identifier of the MCP list-tools conversation item to update.
+	///   - eventId: The server event identifier associated with this progress update.
+	///   - status: The current status to record for the list-tools operation.
+	func recordMcpListToolsProgress(itemId: String, eventId: String, status: Item.Status) {
+		/// Persist status & last event id
+		mcpListToolsProgress[itemId] = status
+		mcpListToolsLastEventId[itemId] = eventId
+
+		/// Ensure there is at least a placeholder Item in the entries list
+		if entries.firstIndex(where: { $0.id == itemId }) == nil {
+			let placeholder = Item.MCPListTools(id: itemId, server: nil, tools: nil)
+			entries.append(.mcpListTools(placeholder))
+		}
+	}
+	
+	func recordMcpResponseProgress(itemId: String, eventId: String, status: Item.Status) {
+		mcpCallState[itemId] = .call(status)
+		mcpResponseLastEventId[itemId] = eventId
+	}
+	
 	func handleEvent(_ event: ServerEvent) throws {
-		if debug { logger.debug("Did receive ServerEvent.\(event.caseName)(id: \(event.id))\n\(event)") }
+		log(serverEvent: event)
 		
 		switch event {
+		
+		// MARK: Error
+		
 		case let .error(_, error):
 			errorStream.yield(error)
 			if debug { logger.warning("Received error: \(error)") }
+		
+		// MARK: Session
+		
 		case let .sessionCreated(_, session):
 			self.session = session
-			if let sessionUpdateCallback { try updateSession(withChanges: sessionUpdateCallback) }
+			if let sessionUpdateCallback {
+				try updateSession(withChanges: sessionUpdateCallback)
+			}
 		case let .sessionUpdated(_, session):
 			self.session = session
+		
+		// MARK: Conversation Item
+		
 		case let .conversationItemCreated(_, item, _):
 			entries.append(item)
 		case let .conversationItemAdded(_, item, _):
-			entries.append(item)
+			/// Replace placeholder if one exists, otherwise append
+			if let index = entries.firstIndex(where: { $0.id == item.id }) {
+				entries[index] = item
+			} else {
+				entries.append(item)
+			}
+			if case let .mcpCall(call) = item {
+				mcpCallState[call.id] = .added
+			}
 		case let .conversationItemDone(_, item, _):
 			/// Update the existing item with the completed version
 			if let index = entries.firstIndex(where: { $0.id == item.id }) {
 				entries[index] = item
 			}
+			
+			/// If this finalized item is an MCP list-tools,
+			/// mark its progress and lastEventId
+			if case .mcpListTools = item {
+				mcpListToolsProgress[item.id] = .completed
+				mcpListToolsLastEventId[item.id] = event.id
+			}
+			if case let .mcpCall(call) = item {
+				/// Preserve failure state if MCP call previously failed;
+				/// also skip createResponse since responseMCPCallFailed already sent it
+				if mcpCallState[call.id] != .call(.incomplete) {
+					mcpCallState[call.id] = .response(.completed)
+					if debug { logger.debug("Sending `createResponse` after MCP item done for id: \(call.id) with status: .completed") }
+					try send(event: .createResponse())
+				}
+			}
 		case let .conversationItemDeleted(_, itemId):
 			entries.removeAll { $0.id == itemId }
+			mcpListToolsProgress.removeValue(forKey: itemId)
+			mcpListToolsLastEventId.removeValue(forKey: itemId)
+			mcpCallState.removeValue(forKey: itemId)
+			mcpResponseLastEventId.removeValue(forKey: itemId)
+		
+		// MARK: Response Output Item Added
+		case let .responseOutputItemAdded(eventId, _, _, item):
+			if case let .mcpCall(call) = item {
+				mcpCallState[call.id] = .added
+				mcpResponseLastEventId[call.id] = eventId
+			}
+			
+		// MARK: MCP Call Args
+		case let .responseMCPCallArgumentsDelta(_, _, itemId, _, _, _):
+			mcpCallState[itemId] = .call(.inProgress)
+		case let .responseMCPCallArgumentsDone(_, _, itemId, _, _):
+			mcpCallState[itemId] = .call(.completed)
+		
+		// MARK: Input Audio Transcription
+		
 		case let .conversationItemInputAudioTranscriptionCompleted(_, itemId, contentIndex, transcript, _, _):
-			updateEvent(id: itemId) { message in
+			updateEventMessage(id: itemId) { message in
 				guard case let .inputAudio(audio) = message.content[contentIndex] else { return }
 
 				message.content[contentIndex] = .inputAudio(.init(audio: audio.audio, transcript: transcript))
@@ -412,36 +656,48 @@ private extension Conversation {
 		case let .conversationItemInputAudioTranscriptionFailed(_, _, _, error):
 			errorStream.yield(error)
 			if debug { logger.warning("Received error: \(error)") }
+		
+		// MARK: Response
+		
 		case let .responseCreated(_, response):
 			if id == nil {
 				id = response.conversationId
 			}
+		
+		// MARK: Response Content Part
+		
 		case let .responseContentPartAdded(_, _, itemId, _, contentIndex, part):
-			updateEvent(id: itemId) { message in
+			updateEventMessage(id: itemId) { message in
 				message.content.insert(.init(from: part), at: contentIndex)
 			}
 		case let .responseContentPartDone(_, _, itemId, _, contentIndex, part):
-			updateEvent(id: itemId) { message in
+			updateEventMessage(id: itemId) { message in
 				message.content[contentIndex] = .init(from: part)
 			}
+		
+		// MARK: Response Text
+		
 		case let .responseTextDelta(_, _, itemId, _, contentIndex, delta):
-			updateEvent(id: itemId) { message in
+			updateEventMessage(id: itemId) { message in
 				guard case let .text(text) = message.content[contentIndex] else { return }
 
 				message.content[contentIndex] = .text(text + delta)
 			}
 		case let .responseTextDone(_, _, itemId, _, contentIndex, text):
-			updateEvent(id: itemId) { message in
+			updateEventMessage(id: itemId) { message in
 				message.content[contentIndex] = .text(text)
 			}
+		
+		// MARK: Response Audio
+		
 		case let .responseAudioTranscriptDelta(_, _, itemId, _, contentIndex, delta):
-			updateEvent(id: itemId) { message in
+			updateEventMessage(id: itemId) { message in
 				guard case let .audio(audio) = message.content[contentIndex] else { return }
 
 				message.content[contentIndex] = .audio(.init(audio: audio.audio, transcript: (audio.transcript ?? "") + delta))
 			}
 		case let .responseAudioTranscriptDone(_, _, itemId, _, contentIndex, transcript):
-			updateEvent(id: itemId) { message in
+			updateEventMessage(id: itemId) { message in
 				guard case let .audio(audio) = message.content[contentIndex] else { return }
 
 				message.content[contentIndex] = .audio(.init(audio: audio.audio, transcript: transcript))
@@ -450,18 +706,35 @@ private extension Conversation {
 			/// Track which item is currently producing audio output
 			playingItemID = itemId
 			
-			updateEvent(id: itemId) { message in
+			updateEventMessage(id: itemId) { message in
 				guard case let .audio(audio) = message.content[contentIndex] else { return }
 				message.content[contentIndex] = .audio(.init(audio: (audio.audio?.data ?? Data()) + delta.data, transcript: audio.transcript))
 			}
+
+        case let .responseOutputAudioDone(_, _, itemId, _, _):
+            /// Server finished sending output audio for this item.
+			/// Clear active playing tracking if matching.
+            if playingItemID == itemId {
+                playingItemID = nil
+            }
+		
+		// MARK: Function Call Args
+		
 		case let .responseFunctionCallArgumentsDelta(_, _, itemId, _, _, delta):
-			updateEvent(id: itemId) { functionCall in
+			/// Removed `mcpCallState` update here
+			/// to avoid polluting MCP tracking for non-MCP function calls
+			updateEventFunctionCall(id: itemId) { functionCall in
 				functionCall.arguments.append(delta)
 			}
 		case let .responseFunctionCallArgumentsDone(_, _, itemId, _, _, arguments):
-			updateEvent(id: itemId) { functionCall in
+			/// Removed `mcpCallState` update here
+			/// to avoid polluting MCP tracking for non-MCP function calls
+			updateEventFunctionCall(id: itemId) { functionCall in
 				functionCall.arguments = arguments
 			}
+		
+		// MARK: Audio Buffer
+		
 		case .inputAudioBufferSpeechStarted:
 			isUserSpeaking = true
 		case .inputAudioBufferSpeechStopped:
@@ -487,11 +760,27 @@ private extension Conversation {
 			/// Audio buffer was cleared, model is no longer speaking
 			isModelSpeaking = false
 			playingItemID = nil
+		
+		// MARK: Output Done
+		
 		case let .responseOutputItemDone(_, _, _, item):
-			updateEvent(id: item.id) { message in
+			updateEventMessage(id: item.id) { message in
 				guard case let .message(newMessage) = item else { return }
 				message = newMessage
 			}
+			
+			if case let .mcpCall(call) = item {
+				/// Preserve failure state if MCP call previously failed;
+				/// also skip createResponse since responseMCPCallFailed already sent it
+				if mcpCallState[call.id] != .call(.incomplete) {
+					mcpCallState[call.id] = .response(.completed)
+					if debug { logger.debug("Sending `createResponse` after MCP output item done for id: \(call.id) with status: .completed") }
+					try send(event: .createResponse())
+				}
+			}
+		
+		// MARK: Truncated
+		
 		case let .conversationItemTruncated(_, itemId, _, _):
 			/// If the completed item is the one we were tracking as playing, clear it
 			if playingItemID == itemId {
@@ -503,6 +792,32 @@ private extension Conversation {
 				modelAudioAccumulatedMs += Int(Date().timeIntervalSince(start) * 1000.0)
 			}
 			modelAudioStartDate = nil
+		
+		// MARK: MCP
+		
+		case let .mcpListToolsInProgress(eventId, itemId):
+			recordMcpListToolsProgress(itemId: itemId, eventId: eventId, status: .inProgress)
+		case let .mcpListToolsCompleted(eventId, itemId):
+			recordMcpListToolsProgress(itemId: itemId, eventId: eventId, status: .completed)
+		case let .mcpListToolsFailed(eventId, itemId):
+			recordMcpListToolsProgress(itemId: itemId, eventId: eventId, status: .incomplete)
+		
+		case let .responseMCPCallInProgress(eventId, itemId, _):
+			/// Preserve .call(.completed) if arguments were already finalized
+			if mcpCallState[itemId] != .call(.completed) {
+				mcpCallState[itemId] = .call(.inProgress)
+			}
+			mcpResponseLastEventId[itemId] = eventId
+		case let .responseMCPCallFailed(eventId, itemId, _):
+			mcpCallState[itemId] = .call(.incomplete)
+			mcpResponseLastEventId[itemId] = eventId
+			try send(event: .createResponse())
+		case let .responseMCPCallCompleted(eventId, itemId, _):
+			/// leave state unchanged as per instruction
+			mcpResponseLastEventId[itemId] = eventId
+			
+		// MARK: Not Handled
+		
 		case .conversationItemRetrieved,
 			 .conversationItemInputAudioTranscriptionDelta,
 			 .conversationItemInputAudioTranscriptionSegment,
@@ -510,19 +825,32 @@ private extension Conversation {
 			 .inputAudioBufferCleared,
 			 .inputAudioBufferTimeoutTriggered,
 			 .responseDone,
-			 .responseOutputItemAdded,
-			 .responseOutputAudioDone,
-			 .responseMCPCallArgumentsDelta,
-			 .responseMCPCallArgumentsDone,
-			 .mcpListToolsInProgress,
-			 .mcpListToolsCompleted,
-			 .mcpListToolsFailed,
-			 .responseMCPCallInProgress,
-			 .responseMCPCallCompleted,
-			 .responseMCPCallFailed,
 			 .rateLimitsUpdated:
-			if debug { logger.warning("Unhandled server event `\(event.caseName)`:\n\(event)") }
+			log(serverEvent: event, isHandled: false)
 		}
+	}
+	
+	private func log(
+		serverEvent event: ServerEvent,
+		isHandled: Bool = true
+	) {
+		guard debug else { return }
+		
+		let prettyPrintedEvent = "\(json5: event, encoder: .prettyPrinted)"
+			.components(separatedBy: .newlines)
+			.enumerated()
+			.map { enumerated in (enumerated.offset == 0 ? "" : "  ") + enumerated.element }
+			.joined(separator: "\n")
+		
+		logger.log(
+			level: isHandled ? .debug : .error,
+			"""
+			\(isHandled ? "Received" : "Unhandled") Server Event 
+			┣ case: `ServerEvent.\(event.caseName)`
+			┣ id: \(event.id)`
+			┗ json: \(prettyPrintedEvent)
+			"""
+		)
 	}
 	
 	// MARK: ┗ Update
@@ -579,7 +907,12 @@ private extension Conversation {
 		return mostRecentAssistantMessageID
 	}
 	
-	func updateEvent(id: String, modifying closure: (inout Item.Message) -> Void) {
+	/// Mutates a message entry with the given identifier in-place.
+	/// - Note: No-op if the entry can't be found or isn't a message.
+	/// - Parameters:
+	///   - id: The identifier of the conversation item to update.
+	///   - closure: A mutating closure that receives the message by inout.
+	func updateEventMessage(id: String, modifying closure: (inout Item.Message) -> Void) {
 		guard let index = entries.firstIndex(where: { $0.id == id }),
 			  case var .message(message) = entries[index]
 		else { return }
@@ -589,7 +922,12 @@ private extension Conversation {
 		entries[index] = .message(message)
 	}
 	
-	func updateEvent(id: String, modifying closure: (inout Item.FunctionCall) -> Void) {
+	/// Mutates a function-call entry with the given identifier.
+	/// - Note: Safely does nothing if the entry is missing or of a different kind.
+	/// - Parameters:
+	///   - id: Identifier of the target function-call item.
+	///   - closure: Inout mutator applied to the function call payload.
+	func updateEventFunctionCall(id: String, modifying closure: (inout Item.FunctionCall) -> Void) {
 		guard let index = entries.firstIndex(where: { $0.id == id }),
 			  case var .functionCall(functionCall) = entries[index]
 		else { return }
@@ -598,4 +936,60 @@ private extension Conversation {
 		
 		entries[index] = .functionCall(functionCall)
 	}
+	
+	/// Mutates an MCP tool-call entry by identifier.
+	/// - Note: No-op when the entry is not found or not a tool-call.
+	/// - Parameters:
+	///   - id: Identifier of the target tool-call item.
+	///   - closure: Inout mutator for the MCP tool-call payload.
+	func updateEventMcpToolCall(id: String, modifying closure: (inout Item.MCPToolCall) -> Void) {
+		guard let index = entries.firstIndex(where: { $0.id == id }),
+			  case var .mcpToolCall(mcpToolCall) = entries[index]
+		else { return }
+		
+		closure(&mcpToolCall)
+		
+		entries[index] = .mcpToolCall(mcpToolCall)
+	}
+	
+	/// Mutates an MCP list-tools entry by identifier.
+	///
+	/// Updates an existing MCP list-tools entity
+	/// when progress, completion, or failure events arrive.
+	///
+	/// - Note: If no matching MCP list-tools item exists, this is a no-op.
+	///
+	/// - Parameters:
+	///   - id: Identifier of the target list-tools item.
+	///   - closure: Inout mutator for the MCP list-tools payload.
+	func updateEventMcpListTools(id: String, modifying closure: (inout Item.MCPListTools) -> Void) {
+		if let index = entries.firstIndex(where: { $0.id == id }),
+		   case var .mcpListTools(value) = entries[index] {
+			closure(&value)
+			entries[index] = .mcpListTools(value)
+		} else {
+			// let new = Item.MCPListTools(id: id, server: nil, tools: nil, progress: .inProgress)
+			let new = Item.MCPListTools(id: id, server: nil, tools: nil)
+			entries.append(.mcpListTools(new))
+		}
+	}
+	
+	/// Upserts an MCP list-tools entry by identifier.
+	/// - Parameters:
+	///   - id: Identifier of the list-tools item.
+	///   - server: Optional server label to set.
+	///   - tools: Optional tools list to set.
+	func upsertEventMcpListTools(id: String, server: String?, tools: [Item.MCPListTools.Tool]?) {
+		if let index = entries.firstIndex(where: { $0.id == id }) {
+			if case var .mcpListTools(value) = entries[index] {
+				if let server { value.server = server }
+				if let tools { value.tools = tools }
+				entries[index] = .mcpListTools(value)
+			}
+		} else {
+			let value = Item.MCPListTools(id: id, server: server, tools: tools)
+			entries.append(.mcpListTools(value))
+		}
+	}
 }
+
