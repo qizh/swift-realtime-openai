@@ -1190,6 +1190,9 @@ public enum JSONSchemaValidationError: LocalizedError, CustomStringConvertible, 
 	case stringEnumMismatch(allowed: [String], actual: String, path: String)
 	case arrayTooShort(min: Int, actual: Int, path: String)
 	case arrayTooLong(max: Int, actual: Int, path: String)
+	case numberTooSmall(minimum: Double, actual: Double, exclusive: Bool, path: String)
+	case numberTooLarge(maximum: Double, actual: Double, exclusive: Bool, path: String)
+	case notMultipleOf(multipleOf: Int, actual: Double, path: String)
 
 	public var errorDescription: String? { description }
 	public var description: String {
@@ -1197,19 +1200,25 @@ public enum JSONSchemaValidationError: LocalizedError, CustomStringConvertible, 
 		case let .typeMismatch(expected, actual, path):
 			"Type mismatch at \(path): expected \(expected), got \(actual)"
 		case let .missingRequiredProperty(name, path):
-			"Missing required property ‘\(name)’ at \(path)"
+			"Missing required property '\(name)' at \(path)"
 		case let .missingRequiredArguments(required):
 			"Missing required arguments: \(required.joined(separator: ", "))"
 		case let .unknownProperty(name, path):
-			"Unknown property ‘\(name)’ at \(path)"
+			"Unknown property '\(name)' at \(path)"
 		case let .anyOfNoMatch(path):
 			"No variant matched for anyOf at \(path)"
 		case let .stringEnumMismatch(allowed, actual, path):
-			"String enum mismatch at \(path): allowed {\(allowed.joined(separator: ", "))}, got ‘\(actual)’"
+			"String enum mismatch at \(path): allowed {\(allowed.joined(separator: ", "))}, got '\(actual)'"
 		case let .arrayTooShort(min, actual, path):
 			"Array too short at \(path): min=\(min), actual=\(actual)"
 		case let .arrayTooLong(max, actual, path):
 			"Array too long at \(path): max=\(max), actual=\(actual)"
+		case let .numberTooSmall(minimum, actual, exclusive, path):
+			"Number too small at \(path): \(exclusive ? "exclusiveMinimum" : "minimum")=\(minimum), actual=\(actual)"
+		case let .numberTooLarge(maximum, actual, exclusive, path):
+			"Number too large at \(path): \(exclusive ? "exclusiveMaximum" : "maximum")=\(maximum), actual=\(actual)"
+		case let .notMultipleOf(multipleOf, actual, path):
+			"Number not a multiple at \(path): multipleOf=\(multipleOf), actual=\(actual)"
 		}
 	}
 }
@@ -1286,7 +1295,8 @@ extension JSONSchema {
 			}
 			_ = format /// The format hint is not validated in the light version
 
-		case .integer:
+		case let .integer(multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, _, _, _, _):
+			let value: Double
 			if let n = json.numberValue {
 				if n.rounded(.towardZero) != n {
                     throw JSONSchemaValidationError.typeMismatch(
@@ -1295,12 +1305,13 @@ extension JSONSchema {
                         path: path
                     )
 				}
-			} else if json.integerValue != nil {
-				/// OK
+				value = n
+			} else if let i = json.integerValue {
+				value = Double(i)
 			} else if let s = json.stringValue,
                       let n = Double(s),
                       n.rounded(.towardZero) == n {
-				/// Allow a numerical string if it is an integer
+				value = n
 			} else {
                 throw JSONSchemaValidationError.typeMismatch(
                     expected: "integer",
@@ -1308,17 +1319,34 @@ extension JSONSchema {
                     path: path
                 )
 			}
+			try validateNumericConstraints(
+				value: value, multipleOf: multipleOf,
+				minimum: minimum, exclusiveMinimum: exclusiveMinimum,
+				maximum: maximum, exclusiveMaximum: exclusiveMaximum,
+				path: path
+			)
 
-		case .number:
-			if json.numberValue == nil,
-               json.integerValue == nil,
-               Double(json.stringValue ?? "") == nil {
+		case let .number(multipleOf, minimum, exclusiveMinimum, maximum, exclusiveMaximum, _, _, _, _):
+			let value: Double
+			if let n = json.numberValue {
+				value = n
+			} else if let i = json.integerValue {
+				value = Double(i)
+			} else if let s = json.stringValue, let n = Double(s) {
+				value = n
+			} else {
                 throw JSONSchemaValidationError.typeMismatch(
                     expected: "number",
                     actual: json.caseName,
                     path: path
                 )
 			}
+			try validateNumericConstraints(
+				value: value, multipleOf: multipleOf,
+				minimum: minimum, exclusiveMinimum: exclusiveMinimum,
+				maximum: maximum, exclusiveMaximum: exclusiveMaximum,
+				path: path
+			)
 
 		case .boolean:
 			guard json.boolValue != nil else {
@@ -1400,6 +1428,46 @@ extension JSONSchema {
 				try _validate(value, against: add, path: path + "." + key)
 			}
 			/// When additionalProperties is nil, allow unknown properties (JSON Schema default)
+		}
+	}
+	
+	/// Validates numeric constraints (minimum, maximum, exclusiveMinimum, exclusiveMaximum, multipleOf)
+	private static func validateNumericConstraints(
+		value: Double,
+		multipleOf: Int?,
+		minimum: Int?,
+		exclusiveMinimum: Int?,
+		maximum: Int?,
+		exclusiveMaximum: Int?,
+		path: String
+	) throws {
+		if let min = minimum, value < Double(min) {
+			throw JSONSchemaValidationError.numberTooSmall(
+				minimum: Double(min), actual: value, exclusive: false, path: path
+			)
+		}
+		if let exMin = exclusiveMinimum, value <= Double(exMin) {
+			throw JSONSchemaValidationError.numberTooSmall(
+				minimum: Double(exMin), actual: value, exclusive: true, path: path
+			)
+		}
+		if let max = maximum, value > Double(max) {
+			throw JSONSchemaValidationError.numberTooLarge(
+				maximum: Double(max), actual: value, exclusive: false, path: path
+			)
+		}
+		if let exMax = exclusiveMaximum, value >= Double(exMax) {
+			throw JSONSchemaValidationError.numberTooLarge(
+				maximum: Double(exMax), actual: value, exclusive: true, path: path
+			)
+		}
+		if let mult = multipleOf, mult != 0 {
+			let remainder = value.truncatingRemainder(dividingBy: Double(mult))
+			if abs(remainder) > 1e-10 {
+				throw JSONSchemaValidationError.notMultipleOf(
+					multipleOf: mult, actual: value, path: path
+				)
+			}
 		}
 	}
 }

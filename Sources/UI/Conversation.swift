@@ -112,8 +112,21 @@ public final class Conversation: @unchecked Sendable {
 	///   - ``mcpListToolsStatus(for:)`` for querying a specific MCP list-tools item by ID.
 	public var lastMcpEntryStatus: Item.Status? {
 		if let lastEntry = entries.last {
-				mcpCallState[lastEntry.id]?.status
-			?? 	mcpListToolsProgress[lastEntry.id]
+			if let callStep = mcpCallState[lastEntry.id] {
+				/// Map MCPCallStep to status: .call(.completed) means "awaiting response"
+				/// which is still in-progress from the caller's perspective
+				if callStep.isInProgress {
+					.inProgress
+				} else if callStep.isIncomplete {
+					.incomplete
+				} else if callStep.isComplete {
+					.completed
+				} else {
+					nil
+				}
+			} else {
+				mcpListToolsProgress[lastEntry.id]
+			}
 		} else {
 			nil
 		}
