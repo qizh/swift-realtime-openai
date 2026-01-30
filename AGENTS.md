@@ -12,6 +12,7 @@
 - Small changes (which are tested with Swift CLI) should be committed without asking for permission.
 - Commit title and description should be generated automatically.
 - For complete tasks use `- [x] Task`, leaving the `- List item` for lists and sublists.
+- IMPORTANT: Always commit small fixes immediately after testing - do not wait for permission.
 
 ## Development Workflow
 
