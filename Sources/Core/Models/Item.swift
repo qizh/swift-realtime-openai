@@ -289,6 +289,7 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 		public var error: Error?
 
 		/// The ID of an associated approval request, if any.
+		@CodedAt("approval_request_id")
 		public var approvalRequestId: String?
 
 		/// Creates a new `MCPToolCall` instance.
@@ -355,6 +356,7 @@ public enum Item: Identifiable, Equatable, Hashable, Sendable {
 		public var id: String
 
 		/// The ID of the approval request being answered.
+		@CodedAt("approval_request_id")
 		public var approvalRequestId: String
 
 		/// Whether the request was approved.
