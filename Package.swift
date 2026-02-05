@@ -17,7 +17,7 @@ let package = Package(
 	dependencies: [
 		.package(url: "https://github.com/livekit/webrtc-xcframework.git", from: "137.7151.0"),
 		.package(url: "https://github.com/qizh/MetaCodable", from: "1.5.5"),
-		.package(url: "https://github.com/qizh/QizhMacroKit.git", from: "1.3.0"),
+		.package(url: "https://github.com/qizh/QizhMacroKit.git", from: "1.4.2"),
 	],
 	targets: [
 		.target(
